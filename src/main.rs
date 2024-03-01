@@ -7,6 +7,7 @@ use rand::prelude::*;
 enum Error {
     ExcessiveMines,
     InvalidCoordinates,
+    AttemptToFlagRevealedSquare,
 }
 
 /// Represents the type of a square as to the presence of a mine
@@ -61,10 +62,29 @@ impl Square {
     }
 }
 
+struct Coordinate {
+    x: u32,
+    y: u32,
+}
+
+impl Coordinate {
+    pub fn from(x: u32, y: u32) -> Self {
+        Coordinate { x, y }
+    }
+}
+
 enum RevealType {
     Reveal,
     Chord,
     Flag,
+}
+
+enum PlayResult {
+    Flagged(bool),
+    Explosion(Coordinate),
+    NoChange,
+    Revealed(Coordinate),
+    ChordReveal(Vec<PlayResult>),
 }
 
 /// Representation of a minesweeper game board
@@ -181,6 +201,72 @@ impl GameBoard {
                 self.squares[self.xy_to_idx(x, y) as usize].print();
             }
             println!();
+        }
+    }
+
+    /// Toggles the flagged state of a square.
+    /// Returns the updated flagged state of the square.
+    ///
+    /// A revealed square cannot be flagged
+    ///
+    pub fn flag(&mut self, x: u32, y: u32) -> Result<PlayResult, Error> {
+        if x >= self.width || y >= self.height {
+            Err(Error::InvalidCoordinates)
+        } else {
+            let idx = self.xy_to_idx(x, y);
+            let sqr = self.get_square_by_idx(idx)?;
+            if !sqr.is_revealed {
+                self.squares[idx as usize].is_flagged = !sqr.is_flagged;
+                Ok(PlayResult::Flagged(self.squares[idx as usize].is_flagged))
+            } else {
+                Err(Error::AttemptToFlagRevealedSquare) // Maybe return false instead?
+            }
+        }
+    }
+
+    // Defines a single square reveal
+    pub fn reveal(&mut self, x: u32, y: u32) -> Result<PlayResult, Error> {
+        if x >= self.width || y >= self.height {
+            Err(Error::InvalidCoordinates)
+        } else {
+            let idx = self.xy_to_idx(x, y);
+            let sqr = self.get_square_by_idx(idx)?;
+
+            if sqr.is_mine() && !sqr.is_flagged {
+                // If the square is a mine and it's not flagged (unprotected)
+                Ok(PlayResult::Explosion(Coordinate::from(x, y)))
+            } else if !sqr.is_mine() && !sqr.is_flagged && !sqr.is_revealed {
+                // if the square is not a mine, is unflagged, and is unrevealed
+                if self.squares[idx as usize].numeral == 0 {
+                    // If it's a non-numeral square, we can auto-chord it
+                    self.chord(x, y)
+                } else {
+                    // Otherwise, reveal the single square, and set it as so
+                    self.squares[idx as usize].is_revealed = true;
+                    Ok(PlayResult::Revealed(Coordinate::from(x, y)))
+                }
+            } else {
+                // Otherwise no change (user tried to reveal an already revealed square)
+                Ok(PlayResult::NoChange)
+            }
+        }
+    }
+
+    /// Executes a 'chord' reveal on the requested square.
+    pub fn chord(&mut self, x: u32, y: u32) -> Result<PlayResult, Error> {
+        if x >= self.width || y >= self.height {
+            return Err(Error::InvalidCoordinates);
+        } else {
+        }
+
+        unimplemented!()
+    }
+
+    pub fn play(&mut self, x: u32, y: u32, reveal_type: RevealType) -> Result<PlayResult, Error> {
+        match reveal_type {
+            RevealType::Flag => self.flag(x, y),
+            RevealType::Reveal => self.reveal(x, y),
+            _ => unimplemented!(),
         }
     }
 }
