@@ -9,7 +9,6 @@ pub enum Error {
     ExcessiveMines,
     InvalidCoordinates,
     IndexOutOfBounds,
-    AttemptToFlagRevealedSquare,
     InvalidCascade,
     UnexpectedResult,
 }
@@ -24,10 +23,10 @@ pub enum SquareType {
 /// Representation of a single minesweeper square.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Square {
-    is_revealed: bool,
-    is_flagged: bool,
-    square_type: SquareType,
-    numeral: u32,
+    pub is_revealed: bool,
+    pub is_flagged: bool,
+    pub square_type: SquareType,
+    pub numeral: u32,
 }
 
 impl Default for Square {
@@ -72,8 +71,8 @@ impl Square {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Coordinate {
-    x: u32,
-    y: u32,
+    pub x: u32,
+    pub y: u32,
 }
 
 impl From<(u32, u32)> for Coordinate {
@@ -129,6 +128,12 @@ impl GameBoard {
         gb.populate_mines(num_mines)?;
         gb.populate_numerals()?;
         Ok(gb)
+    }
+
+    pub fn reset(&mut self) {
+        self.squares = (0..self.width * self.height)
+            .map(|_| Square::default())
+            .collect();
     }
 
     #[allow(dead_code)]
@@ -311,7 +316,7 @@ impl GameBoard {
                 self.squares[idx as usize].is_flagged = !sqr.is_flagged;
                 Ok(PlayResult::Flagged(self.squares[idx as usize].is_flagged))
             } else {
-                Err(Error::AttemptToFlagRevealedSquare) // Maybe return false instead?
+                Ok(PlayResult::NoChange) // Maybe return false instead?
             }
         }
     }
