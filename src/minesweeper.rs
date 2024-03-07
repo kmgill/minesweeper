@@ -460,6 +460,16 @@ impl GameBoard {
             RevealType::Chord => self.chord(x, y),
         }
     }
+
+    pub fn num_flags(&self) -> u32 {
+        self.squares
+            .clone()
+            .into_iter()
+            .map(|s| if s.is_flagged { 1 } else { 0 })
+            .collect::<Vec<u32>>()
+            .into_iter()
+            .sum::<u32>()
+    }
 }
 
 #[test]
