@@ -54,6 +54,7 @@ impl Square {
         self.square_type == SquareType::Mine
     }
 
+    #[allow(dead_code)]
     pub fn print(&self) {
         if self.is_flagged {
             print!(" > ");
@@ -292,6 +293,7 @@ impl GameBoard {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn print(&self) {
         for y in 0..self.height {
             for x in 0..self.width {
@@ -427,6 +429,7 @@ impl GameBoard {
     ///
     /// Conditions
     /// - All non-mine squares are revealed (mined need not be flagged)
+    #[allow(dead_code)]
     pub fn is_win_configuration(&self) -> bool {
         self.squares
             .clone()
@@ -438,6 +441,7 @@ impl GameBoard {
             == 0_u32
     }
 
+    #[allow(dead_code)]
     pub fn is_loss_configuration(&self) -> bool {
         self.squares
             .clone()
