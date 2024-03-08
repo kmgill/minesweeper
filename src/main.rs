@@ -132,6 +132,7 @@ impl MinesweeperFoo {
                         && self.gameboard.is_win_configuration()
                     {
                         self.game_state = GameState::EndedWin;
+                        self.gameboard.flag_all_mines();
                         self.game_finished = Instant::now();
                     } else if self.game_state == GameState::Playing {
                         ui.label(format!(

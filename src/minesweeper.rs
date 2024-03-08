@@ -470,6 +470,18 @@ impl GameBoard {
             .into_iter()
             .sum::<u32>()
     }
+
+    // Don't cheat
+    #[allow(dead_code)]
+    pub fn flag_all_mines(&mut self) {
+        for sqr in self.squares.iter_mut() {
+            if sqr.is_mine() {
+                sqr.is_flagged = true;
+            } else {
+                sqr.is_flagged = false;
+            }
+        }
+    }
 }
 
 #[test]
