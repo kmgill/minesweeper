@@ -18,7 +18,14 @@ const DEFAULT_NUM_MINES: u32 = 40;
 enum GameState {
     NotStarted,
     Playing,
-    Ended,
+    EndedLoss,
+    EndedWin,
+}
+
+impl GameState {
+    pub fn game_ended(&self) -> bool {
+        *self == GameState::EndedLoss || *self == GameState::EndedWin
+    }
 }
 
 fn main() -> Result<(), eframe::Error> {
@@ -107,7 +114,7 @@ impl MinesweeperFoo {
                     self.start_game();
                 }
 
-                self.game_board_ui(ui, self.game_state != GameState::Ended);
+                self.game_board_ui(ui, !self.game_state.game_ended());
 
                 ui.horizontal_centered(|ui| {
                     ui.label(format!(
@@ -117,17 +124,21 @@ impl MinesweeperFoo {
                     ));
 
                     if self.game_state == GameState::Playing
-                        && (self.gameboard.is_loss_configuration()
-                            || self.gameboard.is_win_configuration())
+                        && self.gameboard.is_loss_configuration()
                     {
-                        self.game_state = GameState::Ended;
+                        self.game_state = GameState::EndedLoss;
+                        self.game_finished = Instant::now();
+                    } else if self.game_state == GameState::Playing
+                        && self.gameboard.is_win_configuration()
+                    {
+                        self.game_state = GameState::EndedWin;
                         self.game_finished = Instant::now();
                     } else if self.game_state == GameState::Playing {
                         ui.label(format!(
                             "Time: {:.2}",
                             self.game_started.elapsed().as_secs_f64()
                         ));
-                    } else if self.game_state == GameState::Ended {
+                    } else if self.game_state.game_ended() {
                         ui.label(format!(
                             "Time: {:.2}",
                             (self.game_finished - self.game_started).as_secs_f64()
@@ -191,12 +202,12 @@ impl MinesweeperFoo {
         let desired_size = ui.spacing().interact_size.x * egui::vec2(1.0, 1.0);
         let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
 
-        if self.gameboard.is_win_configuration() {
-            egui::Image::new(egui::include_image!("../assets/win.png")).paint_at(ui, rect)
-        } else if self.gameboard.is_loss_configuration() {
-            egui::Image::new(egui::include_image!("../assets/loss.png")).paint_at(ui, rect)
+        if self.game_state == GameState::EndedLoss {
+            egui::Image::new(egui::include_image!("../assets/loss.png")).paint_at(ui, rect);
+        } else if self.game_state == GameState::EndedWin {
+            egui::Image::new(egui::include_image!("../assets/win.png")).paint_at(ui, rect);
         } else {
-            egui::Image::new(egui::include_image!("../assets/happy.png")).paint_at(ui, rect)
+            egui::Image::new(egui::include_image!("../assets/happy.png")).paint_at(ui, rect);
         }
 
         response
@@ -215,7 +226,7 @@ impl MinesweeperFoo {
 
         //egui::Image::new(egui::include_image!("../assets/blank.png")).paint_at(ui, rect);
 
-        if sqr.is_mine() && sqr.is_revealed {
+        if sqr.is_mine() && (sqr.is_revealed || self.game_state == GameState::EndedLoss) {
             egui::Image::new(egui::include_image!("../assets/mine.png")).paint_at(ui, rect);
         } else if sqr.is_flagged {
             ui.painter().rect(
