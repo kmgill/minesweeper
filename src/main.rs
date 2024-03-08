@@ -6,9 +6,13 @@ use minesweeper::*;
 use anyhow::Result;
 
 use eframe::egui;
-use egui::Vec2;
+use egui::{Color32, Stroke, Vec2};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
+
+const DEFAULT_WIDTH: u32 = 16;
+const DEFAULT_HEIGHT: u32 = 16;
+const DEFAULT_NUM_MINES: u32 = 40;
 
 #[derive(Eq, PartialEq, Debug)]
 enum GameState {
@@ -21,7 +25,7 @@ fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_icon(load_icon())
-            .with_inner_size(Vec2::new(417.0, 500.0))
+            .with_inner_size(Vec2::new(655.0, 722.0))
             .with_resizable(false),
         vsync: true,
         multisampling: 0,
@@ -32,9 +36,9 @@ fn main() -> Result<(), eframe::Error> {
 
     let app = Box::new(MinesweeperFoo {
         gameboard: minesweeper::GameBoard::new_populated_around(
-            10,
-            10,
-            10,
+            DEFAULT_WIDTH,
+            DEFAULT_HEIGHT,
+            DEFAULT_NUM_MINES,
             Coordinate { x: 5, y: 0 },
         )
         .expect("Failed to generate a game board"),
@@ -79,16 +83,23 @@ impl eframe::App for MinesweeperFoo {
 }
 
 impl MinesweeperFoo {
-    fn start_game(&mut self) {
+    fn start_game(&mut self) -> Result<(), Error> {
         self.game_state = GameState::NotStarted;
         self.game_started = std::time::Instant::now();
         self.gameboard.reset();
-        self.gameboard.populate_mines(10);
-        self.gameboard.populate_numerals();
+        self.gameboard.populate_mines(DEFAULT_NUM_MINES)?;
+        self.gameboard.populate_numerals()?;
+        Ok(())
     }
 
     fn on_update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) -> Result<(), Error> {
         install_image_loaders(ctx);
+
+        // println!(
+        //     "width: {}, height: {}",
+        //     ctx.available_rect().width(),
+        //     ctx.available_rect().height()
+        // );
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
@@ -143,7 +154,7 @@ impl MinesweeperFoo {
             .spacing([0.0, 0.0])
             .striped(true)
             .show(ui, |ui| {
-                iproduct!(0..10, 0..10).for_each(|(y, x)| {
+                iproduct!(0..self.gameboard.height, 0..self.gameboard.width).for_each(|(y, x)| {
                     let sqr = self
                         .gameboard
                         .get_square(x, y)
@@ -169,7 +180,7 @@ impl MinesweeperFoo {
                             .expect("Failed to play square");
                         self.set_game_playing();
                     }
-                    if x == 9 {
+                    if x == self.gameboard.width - 1 {
                         ui.end_row();
                     }
                 });
@@ -195,15 +206,24 @@ impl MinesweeperFoo {
         let desired_size = ui.spacing().interact_size.x * egui::vec2(1.0, 1.0);
         let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
 
-        let visuals = ui.style().interact_selectable(&response, false);
-        ui.painter()
-            .rect(rect, 1.0, visuals.bg_fill, visuals.bg_stroke);
+        ui.painter().rect(
+            rect,
+            1.0,
+            Color32::GRAY,
+            Stroke::new(2.0, Color32::DARK_GRAY),
+        );
 
-        egui::Image::new(egui::include_image!("../assets/blank.png")).paint_at(ui, rect);
+        //egui::Image::new(egui::include_image!("../assets/blank.png")).paint_at(ui, rect);
+
         if sqr.is_mine() && sqr.is_revealed {
             egui::Image::new(egui::include_image!("../assets/mine.png")).paint_at(ui, rect);
         } else if sqr.is_flagged {
-            egui::Image::new(egui::include_image!("../assets/unrevealed.png")).paint_at(ui, rect);
+            ui.painter().rect(
+                rect,
+                1.0,
+                Color32::LIGHT_BLUE,
+                Stroke::new(2.0, Color32::DARK_GRAY),
+            );
             egui::Image::new(egui::include_image!("../assets/flag.png")).paint_at(ui, rect);
         } else if sqr.is_revealed {
             match sqr.numeral {
@@ -218,7 +238,12 @@ impl MinesweeperFoo {
                 _ => {}
             };
         } else {
-            egui::Image::new(egui::include_image!("../assets/unrevealed.png")).paint_at(ui, rect)
+            ui.painter().rect(
+                rect,
+                1.0,
+                Color32::LIGHT_BLUE,
+                Stroke::new(2.0, Color32::DARK_GRAY),
+            );
         }
 
         response
