@@ -13,14 +13,20 @@ use itertools::iproduct;
 const DEFAULT_BEGINNER_WIDTH: u32 = 9;
 const DEFAULT_BEGINNER_HEIGHT: u32 = 9;
 const DEFAULT_BEGINNER_NUM_MINES: u32 = 10;
+const DEFAULT_BEGINNER_UI_WIDTH: f32 = 417.0;
+const DEFAULT_BEGINNER_UI_HEIGHT: f32 = 500.0;
 
 const DEFAULT_INTERMEDIATE_WIDTH: u32 = 16;
 const DEFAULT_INTERMEDIATE_HEIGHT: u32 = 16;
 const DEFAULT_INTERMEDIATE_NUM_MINES: u32 = 40;
+const DEFAULT_INTERMEDIATE_UI_WIDTH: f32 = 655.0;
+const DEFAULT_INTERMEDIATE_UI_HEIGHT: f32 = 722.0;
 
 const DEFAULT_EXPERT_WIDTH: u32 = 30;
 const DEFAULT_EXPERT_HEIGHT: u32 = 16;
 const DEFAULT_EXPERT_NUM_MINES: u32 = 99;
+const DEFAULT_EXPERT_UI_WIDTH: f32 = 0.0;
+const DEFAULT_EXPERT_UI_HEIGHT: f32 = 0.0;
 
 #[derive(Eq, PartialEq, Debug)]
 enum GameState {
@@ -55,7 +61,10 @@ fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_icon(load_icon())
-            .with_inner_size(Vec2::new(655.0, 722.0))
+            .with_inner_size(Vec2::new(
+                DEFAULT_INTERMEDIATE_UI_WIDTH,
+                DEFAULT_INTERMEDIATE_UI_HEIGHT,
+            ))
             .with_resizable(false),
         vsync: true,
         multisampling: 0,
@@ -112,13 +121,24 @@ impl eframe::App for MinesweeperFoo {
 }
 
 impl MinesweeperFoo {
-    fn start_game(&mut self, first_click: Option<Coordinate>) -> Result<(), Error> {
+    fn reset_game(&mut self) -> Result<(), Error> {
         self.game_state = GameState::NotStarted;
         self.game_started = std::time::Instant::now();
         self.gameboard.reset();
+        Ok(())
+    }
+
+    fn start_game(&mut self, first_click: Coordinate) -> Result<(), Error> {
+        println!(
+            "Starting game with fist click at x={}, y={}",
+            first_click.x, first_click.y
+        );
 
         self.gameboard
-            .populate_mines_around(self.game_settings.num_mines, first_click)?;
+            .populate_mines_around(self.game_settings.num_mines, Some(first_click))?;
+
+        self.game_started = Instant::now();
+        self.game_state = GameState::Playing;
 
         if self.game_settings.use_numerals {
             self.gameboard.populate_numerals()?;
@@ -139,7 +159,7 @@ impl MinesweeperFoo {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 if self.face_ui(ui).clicked() {
-                    self.start_game(None).expect("Error building new game");
+                    self.reset_game().expect("Error building new game");
                 }
 
                 self.game_board_ui(ui, !self.game_state.game_ended());
@@ -181,13 +201,6 @@ impl MinesweeperFoo {
         Ok(())
     }
 
-    fn set_game_playing(&mut self) {
-        if self.game_state == GameState::NotStarted {
-            self.game_started = Instant::now();
-            self.game_state = GameState::Playing;
-        }
-    }
-
     fn game_board_ui(&mut self, ui: &mut egui::Ui, active: bool) {
         egui::Grid::new("process_grid_outputs")
             .num_columns(10)
@@ -201,24 +214,26 @@ impl MinesweeperFoo {
                         .expect("Error retrieving square");
 
                     let resp = self.square_ui(ui, &sqr);
+                    if resp.clicked() && self.game_state == GameState::NotStarted {
+                        self.start_game(Coordinate { x, y })
+                            .expect("Error starting game");
+                    }
+
                     if resp.clicked_by(egui::PointerButton::Primary) && active {
                         println!("Left Clicked x={}, y={}", x, y);
                         self.gameboard
                             .play(x, y, RevealType::Reveal)
                             .expect("Failed to play square");
-                        self.set_game_playing();
                     } else if resp.clicked_by(egui::PointerButton::Secondary) && active {
                         println!("Right Clicked x={}, y={}", x, y);
                         self.gameboard
                             .play(x, y, RevealType::Flag)
                             .expect("Failed to play square");
-                        self.set_game_playing();
                     } else if resp.clicked_by(egui::PointerButton::Middle) && active {
                         println!("Right Clicked x={}, y={}", x, y);
                         self.gameboard
                             .play(x, y, RevealType::Chord)
                             .expect("Failed to play square");
-                        self.set_game_playing();
                     }
                     if x == self.gameboard.width - 1 {
                         ui.end_row();
@@ -253,8 +268,7 @@ impl MinesweeperFoo {
             Stroke::new(2.0, Color32::DARK_GRAY),
         );
 
-        //egui::Image::new(egui::include_image!("../assets/blank.png")).paint_at(ui, rect);
-
+        // Note: These are insufficient.
         if sqr.is_mine() && (sqr.is_revealed || self.game_state == GameState::EndedLoss) {
             egui::Image::new(egui::include_image!("../assets/mine.png")).paint_at(ui, rect);
         } else if sqr.is_flagged {
