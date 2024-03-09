@@ -10,9 +10,17 @@ use egui::{Color32, Stroke, Vec2};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
 
-const DEFAULT_WIDTH: u32 = 16;
-const DEFAULT_HEIGHT: u32 = 16;
-const DEFAULT_NUM_MINES: u32 = 40;
+const DEFAULT_BEGINNER_WIDTH: u32 = 9;
+const DEFAULT_BEGINNER_HEIGHT: u32 = 9;
+const DEFAULT_BEGINNER_NUM_MINES: u32 = 10;
+
+const DEFAULT_INTERMEDIATE_WIDTH: u32 = 16;
+const DEFAULT_INTERMEDIATE_HEIGHT: u32 = 16;
+const DEFAULT_INTERMEDIATE_NUM_MINES: u32 = 40;
+
+const DEFAULT_EXPERT_WIDTH: u32 = 30;
+const DEFAULT_EXPERT_HEIGHT: u32 = 16;
+const DEFAULT_EXPERT_NUM_MINES: u32 = 99;
 
 #[derive(Eq, PartialEq, Debug)]
 enum GameState {
@@ -22,10 +30,25 @@ enum GameState {
     EndedWin,
 }
 
+struct GameSettings {
+    width: u32,
+    height: u32,
+    num_mines: u32,
+    use_numerals: bool,
+}
+
 impl GameState {
     pub fn game_ended(&self) -> bool {
         *self == GameState::EndedLoss || *self == GameState::EndedWin
     }
+}
+
+struct MinesweeperFoo {
+    gameboard: minesweeper::GameBoard,
+    game_state: GameState,
+    game_started: Instant,
+    game_finished: Instant,
+    game_settings: GameSettings,
 }
 
 fn main() -> Result<(), eframe::Error> {
@@ -43,15 +66,21 @@ fn main() -> Result<(), eframe::Error> {
 
     let app = Box::new(MinesweeperFoo {
         gameboard: minesweeper::GameBoard::new_populated_around(
-            DEFAULT_WIDTH,
-            DEFAULT_HEIGHT,
-            DEFAULT_NUM_MINES,
+            DEFAULT_INTERMEDIATE_WIDTH,
+            DEFAULT_INTERMEDIATE_HEIGHT,
+            DEFAULT_INTERMEDIATE_NUM_MINES,
             Coordinate { x: 5, y: 0 },
         )
         .expect("Failed to generate a game board"),
         game_state: GameState::NotStarted,
         game_started: Instant::now(),
         game_finished: Instant::now(),
+        game_settings: GameSettings {
+            width: DEFAULT_INTERMEDIATE_WIDTH,
+            height: DEFAULT_INTERMEDIATE_HEIGHT,
+            num_mines: DEFAULT_INTERMEDIATE_NUM_MINES,
+            use_numerals: true,
+        },
     });
 
     eframe::run_native("Minesweeper Foo", options, Box::new(|_cc| app))
@@ -76,13 +105,6 @@ pub(crate) fn load_icon() -> egui::IconData {
     }
 }
 
-struct MinesweeperFoo {
-    gameboard: minesweeper::GameBoard,
-    game_state: GameState,
-    game_started: Instant,
-    game_finished: Instant,
-}
-
 impl eframe::App for MinesweeperFoo {
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.on_update(ctx, frame).expect("Failed to update UI");
@@ -90,12 +112,18 @@ impl eframe::App for MinesweeperFoo {
 }
 
 impl MinesweeperFoo {
-    fn start_game(&mut self) -> Result<(), Error> {
+    fn start_game(&mut self, first_click: Option<Coordinate>) -> Result<(), Error> {
         self.game_state = GameState::NotStarted;
         self.game_started = std::time::Instant::now();
         self.gameboard.reset();
-        self.gameboard.populate_mines(DEFAULT_NUM_MINES)?;
-        self.gameboard.populate_numerals()?;
+
+        self.gameboard
+            .populate_mines_around(self.game_settings.num_mines, first_click)?;
+
+        if self.game_settings.use_numerals {
+            self.gameboard.populate_numerals()?;
+        }
+
         Ok(())
     }
 
@@ -111,7 +139,7 @@ impl MinesweeperFoo {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 if self.face_ui(ui).clicked() {
-                    self.start_game();
+                    self.start_game(None).expect("Error building new game");
                 }
 
                 self.game_board_ui(ui, !self.game_state.game_ended());
