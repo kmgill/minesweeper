@@ -36,11 +36,51 @@ enum GameState {
     EndedWin,
 }
 
+enum GameDifficulty {
+    Beginner,
+    Intermediate,
+    Expert,
+    Custom,
+}
+
 struct GameSettings {
     width: u32,
     height: u32,
     num_mines: u32,
     use_numerals: bool,
+    difficulty: GameDifficulty,
+}
+
+impl GameSettings {
+    pub fn beginner() -> Self {
+        GameSettings {
+            width: DEFAULT_BEGINNER_WIDTH,
+            height: DEFAULT_BEGINNER_HEIGHT,
+            num_mines: DEFAULT_BEGINNER_NUM_MINES,
+            use_numerals: true,
+            difficulty: GameDifficulty::Beginner,
+        }
+    }
+
+    pub fn intermediate() -> Self {
+        GameSettings {
+            width: DEFAULT_INTERMEDIATE_WIDTH,
+            height: DEFAULT_INTERMEDIATE_HEIGHT,
+            num_mines: DEFAULT_INTERMEDIATE_NUM_MINES,
+            use_numerals: true,
+            difficulty: GameDifficulty::Intermediate,
+        }
+    }
+
+    pub fn expert() -> Self {
+        GameSettings {
+            width: DEFAULT_EXPERT_WIDTH,
+            height: DEFAULT_EXPERT_HEIGHT,
+            num_mines: DEFAULT_EXPERT_NUM_MINES,
+            use_numerals: true,
+            difficulty: GameDifficulty::Expert,
+        }
+    }
 }
 
 impl GameState {
@@ -84,12 +124,7 @@ fn main() -> Result<(), eframe::Error> {
         game_state: GameState::NotStarted,
         game_started: Instant::now(),
         game_finished: Instant::now(),
-        game_settings: GameSettings {
-            width: DEFAULT_INTERMEDIATE_WIDTH,
-            height: DEFAULT_INTERMEDIATE_HEIGHT,
-            num_mines: DEFAULT_INTERMEDIATE_NUM_MINES,
-            use_numerals: true,
-        },
+        game_settings: GameSettings::intermediate(),
     });
 
     eframe::run_native("Minesweeper Foo", options, Box::new(|_cc| app))
@@ -269,6 +304,26 @@ impl MinesweeperFoo {
         );
 
         // Note: These are insufficient.
+        // Playing
+        //      Unrevealed
+        //      Unrevealed Flagged
+        //      Revealed numeral
+        //      Revealed blank
+        //      Unrevealed, Mouse down, left button
+        //      Unrevealed, Mouse down, chord
+        // Loss
+        //      Unrevealed
+        //      Unrevealed non-mined flagged
+        //      Unrevealed mined flagged
+        //      Revealed mined (losing play)
+        //      Revealed mined (adjacent to losing play)
+        //      Revealed numeral
+        //      Revealed blank
+        // Win
+        //      Unrevealed
+        //      Unrevealed flagged
+        //      Revealed numeral
+        //      Revealed blank
         if sqr.is_mine() && (sqr.is_revealed || self.game_state == GameState::EndedLoss) {
             egui::Image::new(egui::include_image!("../assets/mine.png")).paint_at(ui, rect);
         } else if sqr.is_flagged {
