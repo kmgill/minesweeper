@@ -5,7 +5,7 @@ use minesweeper::*;
 
 use anyhow::Result;
 
-use eframe::{egui, WindowBuilder};
+use eframe::egui;
 use egui::{Color32, Stroke, Vec2, ViewportCommand};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
@@ -36,21 +36,21 @@ enum GameState {
     EndedWin,
 }
 
-#[derive(Eq, PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq)]
 enum GameDifficulty {
     Beginner,
     Intermediate,
     Expert,
-    Custom,
+    // Custom,
 }
 
 impl GameDifficulty {
     fn as_str(&self) -> &'static str {
-        match self {
-            &GameDifficulty::Beginner => "Beginner",
-            &GameDifficulty::Intermediate => "Intermediate",
-            &GameDifficulty::Expert => "Expert",
-            &GameDifficulty::Custom => "Custom",
+        match *self {
+            GameDifficulty::Beginner => "Beginner",
+            GameDifficulty::Intermediate => "Intermediate",
+            GameDifficulty::Expert => "Expert",
+            // GameDifficulty::Custom => "Custom",
         }
     }
 }
@@ -181,7 +181,7 @@ impl MinesweeperFoo {
             GameDifficulty::Beginner => GameSettings::beginner(),
             GameDifficulty::Intermediate => GameSettings::intermediate(),
             GameDifficulty::Expert => GameSettings::expert(),
-            _ => unimplemented!(),
+            // _ => unimplemented!(),
         };
     }
 
@@ -205,6 +205,8 @@ impl MinesweeperFoo {
             first_click.x, first_click.y
         );
 
+        // Make sure we remove any previous mines
+        self.gameboard.reset();
         self.gameboard
             .populate_mines_around(self.game_settings.num_mines, Some(first_click))?;
 
@@ -221,11 +223,11 @@ impl MinesweeperFoo {
     fn on_update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) -> Result<(), Error> {
         install_image_loaders(ctx);
 
-        println!(
-            "width: {}, height: {}",
-            ctx.available_rect().width(),
-            ctx.available_rect().height()
-        );
+        // println!(
+        //     "width: {}, height: {}",
+        //     ctx.available_rect().width(),
+        //     ctx.available_rect().height()
+        // );
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {

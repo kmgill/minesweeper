@@ -476,11 +476,7 @@ impl GameBoard {
     #[allow(dead_code)]
     pub fn flag_all_mines(&mut self) {
         for sqr in self.squares.iter_mut() {
-            if sqr.is_mine() {
-                sqr.is_flagged = true;
-            } else {
-                sqr.is_flagged = false;
-            }
+            sqr.is_flagged = sqr.is_mine();
         }
     }
 }
