@@ -5,28 +5,28 @@ use minesweeper::*;
 
 use anyhow::Result;
 
-use eframe::egui;
-use egui::{Color32, Stroke, Vec2};
+use eframe::{egui, WindowBuilder};
+use egui::{Color32, Stroke, Vec2, ViewportCommand};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
 
 const DEFAULT_BEGINNER_WIDTH: u32 = 9;
 const DEFAULT_BEGINNER_HEIGHT: u32 = 9;
 const DEFAULT_BEGINNER_NUM_MINES: u32 = 10;
-const DEFAULT_BEGINNER_UI_WIDTH: f32 = 417.0;
-const DEFAULT_BEGINNER_UI_HEIGHT: f32 = 500.0;
+const DEFAULT_BEGINNER_UI_WIDTH: f32 = 376.0;
+const DEFAULT_BEGINNER_UI_HEIGHT: f32 = 458.0;
 
 const DEFAULT_INTERMEDIATE_WIDTH: u32 = 16;
 const DEFAULT_INTERMEDIATE_HEIGHT: u32 = 16;
 const DEFAULT_INTERMEDIATE_NUM_MINES: u32 = 40;
 const DEFAULT_INTERMEDIATE_UI_WIDTH: f32 = 655.0;
-const DEFAULT_INTERMEDIATE_UI_HEIGHT: f32 = 722.0;
+const DEFAULT_INTERMEDIATE_UI_HEIGHT: f32 = 737.0;
 
 const DEFAULT_EXPERT_WIDTH: u32 = 30;
 const DEFAULT_EXPERT_HEIGHT: u32 = 16;
 const DEFAULT_EXPERT_NUM_MINES: u32 = 99;
-const DEFAULT_EXPERT_UI_WIDTH: f32 = 0.0;
-const DEFAULT_EXPERT_UI_HEIGHT: f32 = 0.0;
+const DEFAULT_EXPERT_UI_WIDTH: f32 = 1215.0;
+const DEFAULT_EXPERT_UI_HEIGHT: f32 = 737.0;
 
 #[derive(Eq, PartialEq, Debug)]
 enum GameState {
@@ -36,6 +36,7 @@ enum GameState {
     EndedWin,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone)]
 enum GameDifficulty {
     Beginner,
     Intermediate,
@@ -43,12 +44,24 @@ enum GameDifficulty {
     Custom,
 }
 
+impl GameDifficulty {
+    fn as_str(&self) -> &'static str {
+        match self {
+            &GameDifficulty::Beginner => "Beginner",
+            &GameDifficulty::Intermediate => "Intermediate",
+            &GameDifficulty::Expert => "Expert",
+            &GameDifficulty::Custom => "Custom",
+        }
+    }
+}
+
 struct GameSettings {
     width: u32,
     height: u32,
     num_mines: u32,
     use_numerals: bool,
-    difficulty: GameDifficulty,
+    ui_width: f32,
+    ui_height: f32,
 }
 
 impl GameSettings {
@@ -58,7 +71,8 @@ impl GameSettings {
             height: DEFAULT_BEGINNER_HEIGHT,
             num_mines: DEFAULT_BEGINNER_NUM_MINES,
             use_numerals: true,
-            difficulty: GameDifficulty::Beginner,
+            ui_width: DEFAULT_BEGINNER_UI_WIDTH,
+            ui_height: DEFAULT_BEGINNER_UI_HEIGHT,
         }
     }
 
@@ -68,7 +82,8 @@ impl GameSettings {
             height: DEFAULT_INTERMEDIATE_HEIGHT,
             num_mines: DEFAULT_INTERMEDIATE_NUM_MINES,
             use_numerals: true,
-            difficulty: GameDifficulty::Intermediate,
+            ui_width: DEFAULT_INTERMEDIATE_UI_WIDTH,
+            ui_height: DEFAULT_INTERMEDIATE_UI_HEIGHT,
         }
     }
 
@@ -78,7 +93,8 @@ impl GameSettings {
             height: DEFAULT_EXPERT_HEIGHT,
             num_mines: DEFAULT_EXPERT_NUM_MINES,
             use_numerals: true,
-            difficulty: GameDifficulty::Expert,
+            ui_width: DEFAULT_EXPERT_UI_WIDTH,
+            ui_height: DEFAULT_EXPERT_UI_HEIGHT,
         }
     }
 }
@@ -95,6 +111,7 @@ struct MinesweeperFoo {
     game_started: Instant,
     game_finished: Instant,
     game_settings: GameSettings,
+    difficulty: GameDifficulty,
 }
 
 fn main() -> Result<(), eframe::Error> {
@@ -105,7 +122,7 @@ fn main() -> Result<(), eframe::Error> {
                 DEFAULT_INTERMEDIATE_UI_WIDTH,
                 DEFAULT_INTERMEDIATE_UI_HEIGHT,
             ))
-            .with_resizable(false),
+            .with_resizable(true),
         vsync: true,
         multisampling: 0,
         depth_buffer: 0,
@@ -113,18 +130,21 @@ fn main() -> Result<(), eframe::Error> {
         ..Default::default()
     };
 
+    let default_difficulty = GameSettings::intermediate();
+
     let app = Box::new(MinesweeperFoo {
         gameboard: minesweeper::GameBoard::new_populated_around(
-            DEFAULT_INTERMEDIATE_WIDTH,
-            DEFAULT_INTERMEDIATE_HEIGHT,
-            DEFAULT_INTERMEDIATE_NUM_MINES,
+            default_difficulty.width,
+            default_difficulty.height,
+            default_difficulty.num_mines,
             Coordinate { x: 5, y: 0 },
         )
         .expect("Failed to generate a game board"),
         game_state: GameState::NotStarted,
         game_started: Instant::now(),
         game_finished: Instant::now(),
-        game_settings: GameSettings::intermediate(),
+        game_settings: default_difficulty,
+        difficulty: GameDifficulty::Intermediate,
     });
 
     eframe::run_native("Minesweeper Foo", options, Box::new(|_cc| app))
@@ -156,10 +176,26 @@ impl eframe::App for MinesweeperFoo {
 }
 
 impl MinesweeperFoo {
-    fn reset_game(&mut self) -> Result<(), Error> {
+    fn update_difficulty_settings(&mut self) {
+        self.game_settings = match self.difficulty {
+            GameDifficulty::Beginner => GameSettings::beginner(),
+            GameDifficulty::Intermediate => GameSettings::intermediate(),
+            GameDifficulty::Expert => GameSettings::expert(),
+            _ => unimplemented!(),
+        };
+    }
+
+    fn reset_game(&mut self, ctx: &egui::Context) -> Result<(), Error> {
+        self.gameboard =
+            minesweeper::GameBoard::new(self.game_settings.width, self.game_settings.height);
         self.game_state = GameState::NotStarted;
         self.game_started = std::time::Instant::now();
-        self.gameboard.reset();
+
+        ctx.send_viewport_cmd(ViewportCommand::InnerSize(Vec2 {
+            x: self.game_settings.ui_width,
+            y: self.game_settings.ui_height,
+        }));
+
         Ok(())
     }
 
@@ -185,21 +221,46 @@ impl MinesweeperFoo {
     fn on_update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) -> Result<(), Error> {
         install_image_loaders(ctx);
 
-        // println!(
-        //     "width: {}, height: {}",
-        //     ctx.available_rect().width(),
-        //     ctx.available_rect().height()
-        // );
+        println!(
+            "width: {}, height: {}",
+            ctx.available_rect().width(),
+            ctx.available_rect().height()
+        );
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 if self.face_ui(ui).clicked() {
-                    self.reset_game().expect("Error building new game");
+                    self.reset_game(ctx).expect("Error building new game");
                 }
 
                 self.game_board_ui(ui, !self.game_state.game_ended());
 
                 ui.horizontal_centered(|ui| {
+                    let cb = egui::ComboBox::new("Cartesian axis", "")
+                        .width(0_f32)
+                        .selected_text(self.difficulty.as_str());
+                    cb.show_ui(ui, |ui| {
+                        let b = ui.selectable_value(
+                            &mut self.difficulty,
+                            GameDifficulty::Beginner,
+                            "Beginner",
+                        );
+                        let i = ui.selectable_value(
+                            &mut self.difficulty,
+                            GameDifficulty::Intermediate,
+                            "Intermediate",
+                        );
+                        let e = ui.selectable_value(
+                            &mut self.difficulty,
+                            GameDifficulty::Expert,
+                            "Expert",
+                        );
+                        // I don't like this pattern:
+                        if b.changed() || i.changed() || e.changed() {
+                            self.update_difficulty_settings();
+                            self.reset_game(ctx).expect("Failed to reset game");
+                        }
+                    });
                     ui.label(format!(
                         "{} of {}",
                         self.gameboard.num_flags(),

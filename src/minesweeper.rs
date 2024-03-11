@@ -131,6 +131,7 @@ impl GameBoard {
         Ok(gb)
     }
 
+    #[allow(dead_code)]
     pub fn reset(&mut self) {
         self.squares = (0..self.width * self.height)
             .map(|_| Square::default())
