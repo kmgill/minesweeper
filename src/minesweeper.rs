@@ -70,7 +70,7 @@ impl Square {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Coordinate {
     pub x: u32,
     pub y: u32,
@@ -105,6 +105,7 @@ pub enum PlayResult {
     CascadedReveal(Vec<PlayResult>),
 }
 
+#[derive(Debug, Clone)]
 /// Representation of a minesweeper game board
 pub struct GameBoard {
     pub width: u32,
