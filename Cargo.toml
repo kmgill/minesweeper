@@ -1,5 +1,5 @@
 [package]
-name = "minesweeper"
+name = "minesofrust"
 version = "0.1.0"
 edition = "2021"
 
@@ -20,3 +20,35 @@ log = { version = "0.4", features = ["std"] }
 env_logger = "0.11.3"
 lazy_static = "1.4.0"
 chrono = "0.4.19"
+serde = { version = "1.0.125", features = ["derive"] }
+serde_json = "1.0.64"
+dirs = "5.0.0"
+toml = "0.8.2"
+
+
+[package.metadata.deb]
+maintainer = "Kevin M. Gill <apoapsys@gmail.com>"
+copyright = "2024, Kevin M. Gill <apoapsys@gmail.com>"
+license-file = ["LICENSE", "2"]
+extended-description = "Lightweight Minesweeper Clone"
+depends = "$auto"
+section = "games"
+priority = "optional"
+assets = [
+    [
+        "target/release/minesofrust",
+        "/usr/bin/minesofrust",
+        "755",
+    ],
+    [
+        "README.md",
+        "/usr/share/doc/minesofrust/README",
+        "644",
+    ],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/minesofrust", dest = "/usr/bin/minesofrust", mode = "755" },
+    { source = "README.md", dest = "/usr/share/doc/minesofrust/README", mode = "644" },
+]

@@ -1,4 +1,6 @@
-#[derive(Eq, PartialEq, Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Eq, PartialEq, Debug, Clone, Deserialize, Serialize)]
 pub enum GameState {
     NotStarted,
     Playing,
@@ -12,7 +14,7 @@ impl GameState {
     }
 }
 
-#[derive(Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Clone, Deserialize, Serialize)]
 pub enum GameDifficulty {
     Beginner,
     Intermediate,

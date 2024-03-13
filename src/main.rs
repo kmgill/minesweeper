@@ -4,9 +4,6 @@ mod minesweeper;
 mod state;
 mod toggle;
 
-use std::time::Instant;
-
-use constants::*;
 use enums::*;
 use minesweeper::*;
 use state::*;
@@ -14,24 +11,38 @@ use toggle::*;
 
 use anyhow::Result;
 
-use eframe::egui;
+use eframe::{egui, glow};
 use egui::{Color32, Stroke, Vec2, ViewportCommand};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
+use std::time::SystemTime;
+
+fn now() -> f64 {
+    match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+        Ok(n) => n.as_secs_f64(),
+        Err(_) => 0.0,
+    }
+}
 
 #[derive(Clone)]
-struct MinesweeperFoo {
+struct MinesOfRustApp {
     gameboard: minesweeper::GameBoard,
     state: AppState,
+    image_loaders_installed: bool,
 }
 
 fn main() -> Result<(), eframe::Error> {
+    let state = match AppState::load_from_userhome() {
+        Ok(s) => s,
+        Err(_) => AppState::default(),
+    };
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_icon(load_icon())
             .with_inner_size(Vec2::new(
-                DEFAULT_INTERMEDIATE_UI_WIDTH,
-                DEFAULT_INTERMEDIATE_UI_HEIGHT,
+                state.game_settings.ui_width,
+                state.game_settings.ui_height,
             ))
             .with_resizable(true),
         vsync: true,
@@ -41,9 +52,7 @@ fn main() -> Result<(), eframe::Error> {
         ..Default::default()
     };
 
-    let state = AppState::default();
-
-    let app = Box::new(MinesweeperFoo {
+    let app = Box::new(MinesOfRustApp {
         gameboard: minesweeper::GameBoard::new_populated_around(
             state.game_settings.width,
             state.game_settings.height,
@@ -52,9 +61,10 @@ fn main() -> Result<(), eframe::Error> {
         )
         .expect("Failed to generate a game board"),
         state: state,
+        image_loaders_installed: false,
     });
 
-    eframe::run_native("Minesweeper Foo", options, Box::new(|_cc| app))
+    eframe::run_native("Mines of Rust", options, Box::new(|_cc| app))
 }
 
 // https://github.com/emilk/egui/discussions/1574
@@ -76,13 +86,17 @@ pub(crate) fn load_icon() -> egui::IconData {
     }
 }
 
-impl eframe::App for MinesweeperFoo {
+impl eframe::App for MinesOfRustApp {
+    fn on_exit(&mut self, _gl: Option<&glow::Context>) {
+        self.state.save_to_userhome();
+    }
+
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.on_update(ctx, frame).expect("Failed to update UI");
     }
 }
 
-impl MinesweeperFoo {
+impl MinesOfRustApp {
     fn update_difficulty_settings(&mut self) {
         self.state.game_settings = match self.state.difficulty {
             GameDifficulty::Beginner => GameSettings::beginner(),
@@ -98,7 +112,7 @@ impl MinesweeperFoo {
             self.state.game_settings.height,
         );
         self.state.game_state = GameState::NotStarted;
-        self.state.game_started = std::time::Instant::now();
+        self.state.game_started = now();
 
         ctx.send_viewport_cmd(ViewportCommand::InnerSize(Vec2 {
             x: self.state.game_settings.ui_width,
@@ -119,7 +133,7 @@ impl MinesweeperFoo {
         self.gameboard
             .populate_mines_around(self.state.game_settings.num_mines, Some(first_click))?;
 
-        self.state.game_started = Instant::now();
+        self.state.game_started = now();
         self.state.game_state = GameState::Playing;
 
         if self.state.game_settings.use_numerals {
@@ -130,30 +144,48 @@ impl MinesweeperFoo {
     }
 
     fn on_update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) -> Result<(), Error> {
-        install_image_loaders(ctx);
-        // println!(
-        //     "width: {}, height: {}",
-        //     ctx.available_rect().width(),
-        //     ctx.available_rect().height()
-        // );
+        if !self.image_loaders_installed {
+            install_image_loaders(ctx);
+            self.image_loaders_installed = true;
+        }
+        println!(
+            "width: {}, height: {}",
+            ctx.available_rect().width(),
+            ctx.available_rect().height()
+        );
+
+        egui::TopBottomPanel::top("top_panel")
+            .resizable(false)
+            .min_height(50.0)
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    if self.face_ui(ui).clicked() {
+                        self.reset_game(ctx).expect("Error building new game");
+                    }
+                });
+            });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
-                if self.face_ui(ui).clicked() {
-                    self.reset_game(ctx).expect("Error building new game");
-                }
-
                 self.game_board_ui(ui, !self.state.game_state.game_ended());
-
-                egui::Grid::new("app_options")
-                    .num_columns(2)
-                    .spacing([0.0, 50.0])
-                    .striped(false)
-                    .show(ui, |ui| {
-                        self.options_ui(ctx, ui);
-                        self.status_ui(ui);
-                    });
             });
         });
+
+        egui::TopBottomPanel::bottom("bottom_panel")
+            .resizable(false)
+            .min_height(50.0)
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    egui::Grid::new("app_options")
+                        .num_columns(2)
+                        .spacing([10.0, 50.0])
+                        .striped(false)
+                        .show(ui, |ui| {
+                            self.options_ui(ctx, ui);
+                            self.status_ui(ui);
+                        });
+                });
+            });
 
         ctx.request_repaint();
         Ok(())
@@ -170,22 +202,19 @@ impl MinesweeperFoo {
             if self.state.game_state == GameState::Playing && self.gameboard.is_loss_configuration()
             {
                 self.state.game_state = GameState::EndedLoss;
-                self.state.game_finished = Instant::now();
+                self.state.game_finished = now();
             } else if self.state.game_state == GameState::Playing
                 && self.gameboard.is_win_configuration()
             {
                 self.state.game_state = GameState::EndedWin;
                 self.gameboard.flag_all_mines();
-                self.state.game_finished = Instant::now();
+                self.state.game_finished = now();
             } else if self.state.game_state == GameState::Playing {
-                ui.label(format!(
-                    "Time: {:.2}",
-                    self.state.game_started.elapsed().as_secs_f64()
-                ));
+                ui.label(format!("Time: {:.2}", now() - self.state.game_started));
             } else if self.state.game_state.game_ended() {
                 ui.label(format!(
                     "Time: {:.2}",
-                    (self.state.game_finished - self.state.game_started).as_secs_f64()
+                    self.state.game_finished - self.state.game_started
                 ));
             }
         });
@@ -194,10 +223,12 @@ impl MinesweeperFoo {
     fn options_ui(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         egui::Grid::new("app_options")
             .num_columns(2)
-            .spacing([3.0, 3.0])
+            .spacing([5.0, 5.0])
+            .min_row_height(30.0)
             .striped(false)
             .show(ui, |ui| {
                 ui.label("Difficulty:");
+
                 let cb = egui::ComboBox::new("Cartesian axis", "")
                     .width(0_f32)
                     .selected_text(self.state.difficulty.as_str());
@@ -253,7 +284,7 @@ impl MinesweeperFoo {
                         && resp.clicked_by(egui::PointerButton::Primary)
                         && !self.state.left_click_chord
                     {
-                        println!("Left Clicked x={}, y={}", x, y);
+                        println!("Left Clicked x={}, y={} (Reveal)", x, y);
                         self.gameboard
                             .play(x, y, RevealType::Reveal)
                             .expect("Failed to play square");
@@ -269,12 +300,12 @@ impl MinesweeperFoo {
                             .play(x, y, RevealType::Chord)
                             .expect("Failed to play square");
                     } else if resp.clicked_by(egui::PointerButton::Secondary) && active {
-                        println!("Right Clicked x={}, y={}", x, y);
+                        println!("Right Clicked x={}, y={} (Flag)", x, y);
                         self.gameboard
                             .play(x, y, RevealType::Flag)
                             .expect("Failed to play square");
                     } else if active && resp.clicked_by(egui::PointerButton::Middle) {
-                        println!("Right Clicked x={}, y={}", x, y);
+                        println!("Middle Clicked x={}, y={} (Chord)", x, y);
                         self.gameboard
                             .play(x, y, RevealType::Chord)
                             .expect("Failed to play square");
