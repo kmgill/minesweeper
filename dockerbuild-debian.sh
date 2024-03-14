@@ -1,12 +1,12 @@
 #!/bin/bash
 
-MINESWEEPER_VERSION=`cargo pkgid | cut -d \# -f 2`
+MINESWEEPER_VERSION=`cargo pkgid | cut -d \@ -f 2`
 . docker/config.sh
 
 # Build debs for Debian
 DOCKER_IMAGE_NAME=${VENDOR}/build_debs_${PROJECT}
 
-docker build -t ${DOCKER_IMAGE_NAME} --build-arg MINESWEEPER_VERSION=$MINESWEEPER_VERSION -f docker/Dockerfile.debian . 
+docker build -t ${DOCKER_IMAGE_NAME} --progress=plain --build-arg MINESWEEPER_VERSION=$MINESWEEPER_VERSION -f docker/Dockerfile.debian . 
 
 CONTAINER_ID=$(docker run -d ${DOCKER_IMAGE_NAME})
 

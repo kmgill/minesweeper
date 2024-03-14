@@ -1,7 +1,11 @@
 [package]
 name = "minesofrust"
+description = "Simple Minesweeper clone"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+authors = ["Kevin M. Gill <apoapsys@gmail.com>"]
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -44,10 +48,22 @@ assets = [
         "/usr/share/doc/minesofrust/README",
         "644",
     ],
+    [
+        "assets/minesofrust.png",
+        "/usr/share/icons/hicolor/64x64/apps/minesofrust.png",
+        "644",
+    ],
+    [
+        "assets/minesofrust.desktop",
+        "/usr/share/applications/minesofrust.desktop",
+        "644",
+    ],
 ]
 
 [package.metadata.generate-rpm]
 assets = [
     { source = "target/release/minesofrust", dest = "/usr/bin/minesofrust", mode = "755" },
     { source = "README.md", dest = "/usr/share/doc/minesofrust/README", mode = "644" },
+    { source = "assets/mine.png", dest = "/usr/share/icons/hicolor/64x64/apps/minesofrust.png", mode = "644" },
+    { source = "assets/minesofrust.desktop", dest = "/usr/share/applications/minesofrust.desktop", mode = "644" },
 ]
