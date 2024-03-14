@@ -12,7 +12,7 @@ use toggle::*;
 use anyhow::Result;
 
 use eframe::{egui, glow};
-use egui::{Color32, Stroke, Vec2, ViewportCommand};
+use egui::{Color32, Key, KeyboardShortcut, Modifiers, Stroke, Vec2, ViewportCommand};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
 use std::time::SystemTime;
@@ -148,16 +148,22 @@ impl MinesOfRustApp {
             install_image_loaders(ctx);
             self.image_loaders_installed = true;
         }
-        println!(
-            "width: {}, height: {}",
-            ctx.available_rect().width(),
-            ctx.available_rect().height()
-        );
+        // println!(
+        //     "width: {}, height: {}",
+        //     ctx.available_rect().width(),
+        //     ctx.available_rect().height()
+        // );
 
         egui::TopBottomPanel::top("top_panel")
             .resizable(false)
             .min_height(50.0)
             .show(ctx, |ui| {
+                if ui.input_mut(|i| {
+                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::N))
+                }) {
+                    println!("ctrl+n is pressed, resetting game");
+                    self.reset_game(ctx).expect("Error building new game");
+                }
                 ui.vertical_centered(|ui| {
                     if self.face_ui(ui).clicked() {
                         self.reset_game(ctx).expect("Error building new game");
