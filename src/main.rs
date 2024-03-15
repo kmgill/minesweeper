@@ -4,12 +4,12 @@ mod minesweeper;
 mod state;
 mod toggle;
 
+use anyhow::Result;
 use enums::*;
 use minesweeper::*;
 use state::*;
+use std::process;
 use toggle::*;
-
-use anyhow::Result;
 
 use eframe::{egui, glow};
 use egui::{Color32, Key, KeyboardShortcut, Modifiers, Stroke, Vec2, ViewportCommand};
@@ -53,13 +53,10 @@ fn main() -> Result<(), eframe::Error> {
     };
 
     let app = Box::new(MinesOfRustApp {
-        gameboard: minesweeper::GameBoard::new_populated_around(
+        gameboard: minesweeper::GameBoard::new(
             state.game_settings.width,
             state.game_settings.height,
-            state.game_settings.num_mines,
-            Coordinate { x: 5, y: 0 },
-        )
-        .expect("Failed to generate a game board"),
+        ),
         state: state,
         image_loaders_installed: false,
     });
@@ -106,7 +103,7 @@ impl MinesOfRustApp {
         };
     }
 
-    fn reset_game(&mut self, ctx: &egui::Context) -> Result<(), Error> {
+    fn reset_new_game(&mut self, ctx: &egui::Context) -> Result<(), Error> {
         self.gameboard = minesweeper::GameBoard::new(
             self.state.game_settings.width,
             self.state.game_settings.height,
@@ -122,6 +119,15 @@ impl MinesOfRustApp {
         Ok(())
     }
 
+    fn reset_existing_game(&mut self, _ctx: &egui::Context) -> Result<(), Error> {
+        self.gameboard.reset_existing();
+
+        self.state.game_state = GameState::NotStarted;
+        self.state.game_started = now();
+
+        Ok(())
+    }
+
     fn start_game(&mut self, first_click: Coordinate) -> Result<(), Error> {
         println!(
             "Starting game with fist click at x={}, y={}",
@@ -129,9 +135,11 @@ impl MinesOfRustApp {
         );
 
         // Make sure we remove any previous mines
-        self.gameboard.reset();
-        self.gameboard
-            .populate_mines_around(self.state.game_settings.num_mines, Some(first_click))?;
+        //self.gameboard.reset();
+        if !self.gameboard.is_populated {
+            self.gameboard
+                .populate_mines_around(self.state.game_settings.num_mines, Some(first_click))?;
+        }
 
         self.state.game_started = now();
         self.state.game_state = GameState::Playing;
@@ -162,11 +170,24 @@ impl MinesOfRustApp {
                     i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::N))
                 }) {
                     println!("ctrl+n is pressed, resetting game");
-                    self.reset_game(ctx).expect("Error building new game");
+                    self.reset_new_game(ctx).expect("Error building new game");
+                }
+                if ui.input_mut(|i| {
+                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::R))
+                }) {
+                    println!("ctrl+r is pressed, resetting existing game");
+                    self.reset_existing_game(ctx)
+                        .expect("Error rebuilding game");
+                }
+                if ui.input_mut(|i| {
+                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::Q))
+                }) {
+                    println!("Boss can see screen. Ctrl+q is pressed, exiting");
+                    process::exit(0);
                 }
                 ui.vertical_centered(|ui| {
                     if self.face_ui(ui).clicked() {
-                        self.reset_game(ctx).expect("Error building new game");
+                        self.reset_new_game(ctx).expect("Error building new game");
                     }
                 });
             });
@@ -257,7 +278,7 @@ impl MinesOfRustApp {
                     // I don't like this pattern:
                     if b.changed() || i.changed() || e.changed() {
                         self.update_difficulty_settings();
-                        self.reset_game(ctx).expect("Failed to reset game");
+                        self.reset_new_game(ctx).expect("Failed to reset game");
                     }
                 });
                 ui.end_row();

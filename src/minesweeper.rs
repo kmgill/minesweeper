@@ -112,6 +112,7 @@ pub struct GameBoard {
     pub height: u32,
     pub num_mines: u32,
     pub squares: Vec<Square>,
+    pub is_populated: bool,
 }
 
 impl GameBoard {
@@ -121,6 +122,7 @@ impl GameBoard {
             height,
             num_mines: 0,
             squares: (0..width * height).map(|_| Square::default()).collect(),
+            is_populated: false,
         }
     }
 
@@ -277,7 +279,7 @@ impl GameBoard {
                     mines_placed += 1;
                 }
             }
-
+            self.is_populated = true;
             Ok(())
         }
     }
@@ -478,6 +480,14 @@ impl GameBoard {
     pub fn flag_all_mines(&mut self) {
         for sqr in self.squares.iter_mut() {
             sqr.is_flagged = sqr.is_mine();
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn reset_existing(&mut self) {
+        for sqr in self.squares.iter_mut() {
+            sqr.is_flagged = false;
+            sqr.is_revealed = false;
         }
     }
 }
