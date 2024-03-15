@@ -57,7 +57,7 @@ fn main() -> Result<(), eframe::Error> {
             state.game_settings.width,
             state.game_settings.height,
         ),
-        state: state,
+        state,
         image_loaders_installed: false,
     });
 
