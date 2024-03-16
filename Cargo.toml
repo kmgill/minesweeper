@@ -6,7 +6,7 @@ edition = "2021"
 license = "MIT"
 authors = ["Kevin M. Gill <apoapsys@gmail.com>"]
 readme = "README.md"
-
+repository = "https://github.com/kmgill/minesweeper"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
