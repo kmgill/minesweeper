@@ -11,7 +11,7 @@ use state::*;
 use std::process;
 use toggle::*;
 
-use eframe::{egui, glow};
+use eframe::{egui, glow, Theme};
 use egui::{Color32, Key, KeyboardShortcut, Modifiers, Stroke, Vec2, ViewportCommand};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
@@ -26,16 +26,13 @@ fn now() -> f64 {
 
 #[derive(Clone)]
 struct MinesOfRustApp {
-    gameboard: minesweeper::GameBoard,
+    gameboard: GameBoard,
     state: AppState,
     image_loaders_installed: bool,
 }
 
 fn main() -> Result<(), eframe::Error> {
-    let state = match AppState::load_from_userhome() {
-        Ok(s) => s,
-        Err(_) => AppState::default(),
-    };
+    let state = AppState::load_from_userhome().unwrap_or_else(|_| AppState::default());
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -49,11 +46,16 @@ fn main() -> Result<(), eframe::Error> {
         multisampling: 0,
         depth_buffer: 0,
         stencil_buffer: 0,
+        default_theme: if state.dark_mode {
+            Theme::Dark
+        } else {
+            Theme::Light
+        },
         ..Default::default()
     };
 
     let app = Box::new(MinesOfRustApp {
-        gameboard: minesweeper::GameBoard::new(
+        gameboard: GameBoard::new(
             state.game_settings.width,
             state.game_settings.height,
         ),
@@ -84,12 +86,12 @@ pub(crate) fn load_icon() -> egui::IconData {
 }
 
 impl eframe::App for MinesOfRustApp {
-    fn on_exit(&mut self, _gl: Option<&glow::Context>) {
-        self.state.save_to_userhome();
-    }
-
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         self.on_update(ctx, frame).expect("Failed to update UI");
+    }
+
+    fn on_exit(&mut self, _gl: Option<&glow::Context>) {
+        self.state.save_to_userhome();
     }
 }
 
@@ -104,7 +106,7 @@ impl MinesOfRustApp {
     }
 
     fn reset_new_game(&mut self, ctx: &egui::Context) -> Result<(), Error> {
-        self.gameboard = minesweeper::GameBoard::new(
+        self.gameboard = GameBoard::new(
             self.state.game_settings.width,
             self.state.game_settings.height,
         );
@@ -166,6 +168,8 @@ impl MinesOfRustApp {
             .resizable(false)
             .min_height(50.0)
             .show(ctx, |ui| {
+                self.state.dark_mode = ui.visuals().dark_mode; // I don't like having this here.
+
                 if ui.input_mut(|i| {
                     i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::N))
                 }) {
@@ -208,7 +212,11 @@ impl MinesOfRustApp {
                         .spacing([10.0, 50.0])
                         .striped(false)
                         .show(ui, |ui| {
+                            //egui::CollapsingHeader::new("Options")
+                            //    .default_open(false)
+                            //    .show(ui, |ui| {
                             self.options_ui(ctx, ui);
+                            //    });
                             self.status_ui(ui);
                         });
                 });
@@ -219,31 +227,37 @@ impl MinesOfRustApp {
     }
 
     fn status_ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal_centered(|ui| {
-            ui.label(format!(
+        ui.vertical_centered(|ui| {
+            ui.heading("");
+            ui.heading(format!(
                 "{} of {}",
                 self.gameboard.num_flags(),
                 self.gameboard.num_mines
             ));
 
-            if self.state.game_state == GameState::Playing && self.gameboard.is_loss_configuration()
+            let s = if self.state.game_state == GameState::Playing && self.gameboard.is_loss_configuration()
             {
                 self.state.game_state = GameState::EndedLoss;
                 self.state.game_finished = now();
+                "".to_string()
             } else if self.state.game_state == GameState::Playing
                 && self.gameboard.is_win_configuration()
             {
                 self.state.game_state = GameState::EndedWin;
                 self.gameboard.flag_all_mines();
                 self.state.game_finished = now();
+                "".to_string()
             } else if self.state.game_state == GameState::Playing {
-                ui.label(format!("Time: {:.2}", now() - self.state.game_started));
+                format!("Time: {:.2}", now() - self.state.game_started)
             } else if self.state.game_state.game_ended() {
-                ui.label(format!(
+                format!(
                     "Time: {:.2}",
                     self.state.game_finished - self.state.game_started
-                ));
-            }
+                )
+            } else {
+                "".to_string()
+            };
+            ui.heading(s);
         });
     }
 
@@ -286,14 +300,16 @@ impl MinesOfRustApp {
                 ui.label("Left Click Chords:");
                 toggle_ui(ui, &mut self.state.left_click_chord);
                 ui.end_row();
+
+                ui.label("Light/Dark Mode:");
+                egui::widgets::global_dark_light_mode_switch(ui);
             });
     }
 
     fn game_board_ui(&mut self, ui: &mut egui::Ui, active: bool) {
         egui::Grid::new("process_grid_outputs")
-            .num_columns(10)
             .spacing([0.0, 0.0])
-            .striped(true)
+            .striped(false)
             .show(ui, |ui| {
                 iproduct!(0..self.gameboard.height, 0..self.gameboard.width).for_each(|(y, x)| {
                     let sqr = self
@@ -345,7 +361,7 @@ impl MinesOfRustApp {
     }
 
     fn face_ui(&self, ui: &mut egui::Ui) -> egui::Response {
-        let desired_size = ui.spacing().interact_size.x * egui::vec2(1.0, 1.0);
+        let desired_size = ui.spacing().interact_size.x * egui::vec2(1.4, 1.4);
         let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
 
         if self.state.game_state == GameState::EndedLoss {
@@ -359,7 +375,7 @@ impl MinesOfRustApp {
         response
     }
 
-    fn square_ui(&self, ui: &mut egui::Ui, sqr: &minesweeper::Square) -> egui::Response {
+    fn square_ui(&self, ui: &mut egui::Ui, sqr: &Square) -> egui::Response {
         let desired_size = ui.spacing().interact_size.x * egui::vec2(1.0, 1.0);
         let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
 

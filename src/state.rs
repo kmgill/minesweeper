@@ -59,6 +59,7 @@ pub struct AppState {
     pub game_settings: GameSettings,
     pub difficulty: GameDifficulty,
     pub left_click_chord: bool,
+    pub dark_mode: bool,
 }
 
 impl Default for AppState {
@@ -70,6 +71,7 @@ impl Default for AppState {
             game_settings: GameSettings::intermediate(),
             difficulty: GameDifficulty::Intermediate,
             left_click_chord: false,
+            dark_mode: true,
         }
     }
 }
