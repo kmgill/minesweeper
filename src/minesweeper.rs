@@ -89,14 +89,16 @@ impl Coordinate {
     }
 }
 
+#[derive(Debug)]
 pub enum RevealType {
     Reveal,
+    RevealChord,
     Chord,
     Flag,
 }
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PlayResult {
     Flagged(bool),
     Explosion(Coordinate), // Loss
@@ -104,6 +106,8 @@ pub enum PlayResult {
     Revealed(Coordinate),
     CascadedReveal(Vec<PlayResult>),
 }
+
+
 
 #[derive(Debug, Clone)]
 /// Representation of a minesweeper game board
@@ -387,10 +391,7 @@ impl GameBoard {
             return PlayResult::NoChange;
         }
 
-        match self.reveal(x as u32, y as u32) {
-            Ok(res) => res,
-            Err(_) => PlayResult::NoChange,
-        }
+        self.reveal(x as u32, y as u32).unwrap_or_else(|_| PlayResult::NoChange)
     }
 
     /// Determine whether a given square can be chorded.
@@ -429,6 +430,21 @@ impl GameBoard {
         }
     }
 
+    /// Performs a unified reveal then chord in the same coordinate
+    pub fn revealchord(&mut self, x: u32, y: u32) -> Result<PlayResult, Error> {
+        let rv = self.reveal(x, y)?;
+        let rc = self.chord(x, y)?;
+
+        if let PlayResult::CascadedReveal(mut v) = rc {
+            v.push(rv);
+            Ok(PlayResult::CascadedReveal(v))
+        } else if PlayResult::NoChange == rc {
+            Ok(PlayResult::CascadedReveal(vec![rv]))
+        } else {
+            Err(Error::UnexpectedResult)
+        }
+    }
+
     /// Determine if the board is in a winning configuration.
     ///
     /// Conditions
@@ -462,6 +478,7 @@ impl GameBoard {
             RevealType::Flag => self.flag(x, y),
             RevealType::Reveal => self.reveal(x, y),
             RevealType::Chord => self.chord(x, y),
+            RevealType::RevealChord => self.revealchord(x, y)
         }
     }
 

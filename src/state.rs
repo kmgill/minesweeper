@@ -49,29 +49,29 @@ impl GameSettings {
             ui_height: DEFAULT_EXPERT_UI_HEIGHT,
         }
     }
+
+    pub fn settings_for_difficulty(difficulty:&GameDifficulty) -> Self {
+        match difficulty {
+            GameDifficulty::Beginner => GameSettings::beginner(),
+            GameDifficulty::Intermediate => GameSettings::intermediate(),
+            GameDifficulty::Expert => GameSettings::expert()
+        }
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct AppState {
-    pub game_state: GameState,
-    pub game_started: f64,
-    pub game_finished: f64,
-    pub game_settings: GameSettings,
     pub difficulty: GameDifficulty,
     pub left_click_chord: bool,
-    pub dark_mode: bool,
+    pub dark_mode: bool
 }
 
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            game_state: GameState::NotStarted,
-            game_started: 0.0,
-            game_finished: 0.0,
-            game_settings: GameSettings::intermediate(),
             difficulty: GameDifficulty::Intermediate,
             left_click_chord: false,
-            dark_mode: true,
+            dark_mode: true
         }
     }
 }
@@ -85,9 +85,7 @@ impl AppState {
                 config_file_path
             );
             let t = std::fs::read_to_string(config_file_path)?;
-            let mut s: AppState = toml::from_str(&t)?;
-            s.game_state = GameState::NotStarted; // Override game state
-            Ok(s)
+            Ok(toml::from_str(&t)?)
         } else {
             println!("Window state config file does not exist. Will be created on exit");
             Err(anyhow!("Config file does not exist"))
