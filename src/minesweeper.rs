@@ -88,12 +88,13 @@ impl Coordinate {
         self.x == x && self.y == y
     }
 
+    pub fn distance(&self, coord: &Coordinate) -> f32 {
+        ((self.x as f32 - coord.x as f32).powf(2.0) + (self.y as f32 - coord.y as f32).powf(2.0))
+            .sqrt()
+    }
+
     pub fn near(&self, coord: &Coordinate) -> bool {
-        let d = ((self.x as f32 - coord.x as f32).powf(2.0)
-            + (self.y as f32 - coord.y as f32).powf(2.0))
-        .sqrt();
-        // println!("Distance between {:?} and {:?}: {}", self, coord, d);
-        d <= 1.5
+        self.distance(coord) <= 1.5
     }
 }
 

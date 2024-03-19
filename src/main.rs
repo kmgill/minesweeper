@@ -5,7 +5,7 @@ use std::time::SystemTime;
 
 use anyhow::Result;
 use eframe::{egui, glow, Theme};
-use egui::{Color32, Key, KeyboardShortcut, Modifiers, Stroke, Vec2, ViewportCommand};
+use egui::{Key, KeyboardShortcut, Modifiers, Pos2, Stroke, Vec2, ViewportCommand};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
 
@@ -164,11 +164,11 @@ impl MinesOfRustApp {
             install_image_loaders(ctx);
             self.image_loaders_installed = true;
         }
-        // println!(
-        //     "width: {}, height: {}",
-        //     ctx.available_rect().width(),
-        //     ctx.available_rect().height()
-        // );
+        println!(
+            "width: {}, height: {}",
+            ctx.available_rect().width(),
+            ctx.available_rect().height()
+        );
 
         egui::TopBottomPanel::top("top_panel")
             .resizable(false)
@@ -205,7 +205,7 @@ impl MinesOfRustApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 if self.game_state != GameState::Paused {
-                    self.game_board_ui(ui, !self.game_state.game_ended());
+                    self.game_board_ui(ui, !self.game_state.game_ended(), ctx.pointer_latest_pos());
                 } else {
                     self.game_board_paused_ui(ui);
                 }
@@ -327,6 +327,10 @@ impl MinesOfRustApp {
                 toggle_ui(ui, &mut self.state.left_click_chord);
                 ui.end_row();
 
+                ui.label("Fog of War:");
+                toggle_ui(ui, &mut self.state.fog_of_war);
+                ui.end_row();
+
                 ui.label("Light/Dark Mode:");
                 egui::widgets::global_dark_light_mode_switch(ui);
             });
@@ -358,15 +362,28 @@ impl MinesOfRustApp {
                 self.game_settings.height as f32,
             );
         let (rect, _) = ui.allocate_exact_size(desired_size, egui::Sense::click());
-
-        let revealed_color = Color32::GRAY;
-        let border_color = Color32::DARK_GRAY;
-
-        ui.painter()
-            .rect(rect, 1.0, revealed_color, Stroke::new(1.0, border_color));
+        ui.painter().rect(
+            rect,
+            1.0,
+            constants::COLOR_REVEALED,
+            Stroke::new(1.0, constants::COLOR_BORDER),
+        );
     }
 
-    fn game_board_ui(&mut self, ui: &mut egui::Ui, active: bool) {
+    fn game_board_ui(&mut self, ui: &mut egui::Ui, active: bool, pointer_pos: Option<Pos2>) {
+        // This determines which square the mouse is over for fog-of-war mode
+        let mouse_over_coord = if let Some(p) = pointer_pos {
+            let n = ui.next_widget_position();
+            let x = (p.x - ui.spacing().button_padding.x * 2.0) / ui.spacing().interact_size.x;
+            let y = (p.y - n.y) / ui.spacing().interact_size.x;
+            Coordinate {
+                x: x.floor() as u32,
+                y: y.floor() as u32,
+            }
+        } else {
+            Coordinate { x: 9999, y: 9999 }
+        };
+
         egui::Grid::new("process_grid_outputs")
             .spacing([0.0, 0.0])
             .striped(false)
@@ -383,7 +400,12 @@ impl MinesOfRustApp {
                         false
                     };
 
-                    let resp = self.square_ui(ui, &sqr, active, detonated);
+                    let resp = self.square_ui(
+                        ui,
+                        &sqr,
+                        detonated,
+                        mouse_over_coord.distance(&Coordinate { x, y }),
+                    );
                     if resp.clicked() && self.game_state == GameState::NotStarted {
                         self.start_game(Coordinate { x, y })
                             .expect("Error starting game");
@@ -445,26 +467,28 @@ impl MinesOfRustApp {
         &self,
         ui: &mut egui::Ui,
         sqr: &Square,
-        active: bool,
         is_detonated: bool,
+        mouse_distance: f32,
     ) -> egui::Response {
+        let opaque = mouse_distance > 1.5 && self.state.fog_of_war;
+
         let desired_size = (ui.spacing().interact_size.x) * egui::vec2(1.0, 1.0);
         let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+        let visuals_off = ui.style().interact_selectable(&response, false);
+        let visuals_on = ui.style().interact_selectable(&response, true);
 
-        let unrevealed_color = if active && response.clicked() {
-            Color32::WHITE
-        } else {
-            Color32::LIGHT_BLUE
-        };
+        let unrevealed_color = visuals_on.bg_fill; //constants::COLOR_UNREVEALED;
         let revealed_color = if is_detonated {
-            Color32::GOLD
+            constants::COLOR_DETONATED
+        } else if opaque {
+            visuals_on.bg_fill
         } else {
-            Color32::GRAY
+            visuals_off.bg_fill
         };
-        let border_color = Color32::DARK_GRAY;
+        let border_color = constants::COLOR_BORDER;
 
         ui.painter()
-            .rect(rect, 1.0, revealed_color, Stroke::new(1.0, border_color));
+            .rect(rect, 0.0, revealed_color, Stroke::new(0.5, border_color));
 
         // Note: These are insufficient.
         // Playing
@@ -489,11 +513,11 @@ impl MinesOfRustApp {
         //      Revealed blank
         if sqr.is_mine() && (sqr.is_revealed || self.game_state == GameState::EndedLoss) {
             egui::Image::new(egui::include_image!("../assets/mine.png")).paint_at(ui, rect);
-        } else if sqr.is_flagged {
+        } else if sqr.is_flagged && !opaque {
             ui.painter()
-                .rect(rect, 1.0, unrevealed_color, Stroke::new(1.0, border_color));
+                .rect(rect, 0.0, unrevealed_color, Stroke::new(0.5, border_color));
             egui::Image::new(egui::include_image!("../assets/flag.png")).paint_at(ui, rect);
-        } else if sqr.is_revealed {
+        } else if sqr.is_revealed && !opaque {
             match sqr.numeral {
                 1 => egui::Image::new(egui::include_image!("../assets/1.png")).paint_at(ui, rect),
                 2 => egui::Image::new(egui::include_image!("../assets/2.png")).paint_at(ui, rect),
@@ -507,7 +531,7 @@ impl MinesOfRustApp {
             };
         } else {
             ui.painter()
-                .rect(rect, 1.0, unrevealed_color, Stroke::new(1.0, border_color));
+                .rect(rect, 0.0, unrevealed_color, Stroke::new(0.5, border_color));
         }
 
         response

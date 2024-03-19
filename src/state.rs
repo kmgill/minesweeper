@@ -1,10 +1,12 @@
-use crate::constants::*;
-use crate::enums::*;
-use anyhow::{anyhow, Result};
-use serde::{Deserialize, Serialize};
 use std::fs;
 use std::fs::File;
 use std::io::Write;
+
+use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
+
+use crate::constants::*;
+use crate::enums::*;
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct GameSettings {
@@ -64,6 +66,7 @@ pub struct AppState {
     pub difficulty: GameDifficulty,
     pub left_click_chord: bool,
     pub dark_mode: bool,
+    pub fog_of_war: bool,
 }
 
 impl Default for AppState {
@@ -72,6 +75,7 @@ impl Default for AppState {
             difficulty: GameDifficulty::Intermediate,
             left_click_chord: false,
             dark_mode: true,
+            fog_of_war: false,
         }
     }
 }
