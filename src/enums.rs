@@ -6,6 +6,7 @@ pub enum GameState {
     Playing,
     EndedLoss,
     EndedWin,
+    Paused
 }
 
 impl GameState {

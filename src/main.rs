@@ -212,7 +212,11 @@ impl MinesOfRustApp {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
-                self.game_board_ui(ui, !self.game_state.game_ended());
+                if self.game_state != GameState::Paused {
+                    self.game_board_ui(ui, !self.game_state.game_ended());
+                } else {
+                    self.game_board_paused_ui(ui);
+                }
             });
         });
 
@@ -264,6 +268,8 @@ impl MinesOfRustApp {
                 "".to_string()
             } else if self.game_state == GameState::Playing {
                 format!("Time: {:.2}", now() - self.game_started)
+            } else if self.game_state == GameState::Paused {
+                format!("Time: {:.2}", self.game_started)
             } else if self.game_state.game_ended() {
                 format!(
                     "Time: {:.2}",
@@ -273,8 +279,29 @@ impl MinesOfRustApp {
                 "".to_string()
             };
             ui.heading(s);
+
+            if self.game_state == GameState::Playing {
+                if ui.button("Pause").clicked() {
+                    self.pause_game();
+                }
+            } else if self.game_state == GameState::Paused {
+                if ui.button("Resume").clicked() {
+                    self.resume_game();
+                }
+            }
         });
     }
+
+    fn pause_game(&mut self) {
+        self.game_state = GameState::Paused;
+        self.game_started = now() - self.game_started;
+    }
+
+    fn resume_game(&mut self) {
+        self.game_state = GameState::Playing;
+        self.game_started = now() - self.game_started;
+    }
+
 
     fn options_ui(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         egui::Grid::new("app_options")
@@ -339,6 +366,21 @@ impl MinesOfRustApp {
             PlayResult::CascadedReveal(r) => MinesOfRustApp::first_losing_square_of_vec(&r),
             _ => None
         }
+    }
+
+    fn game_board_paused_ui(&mut self, ui: &mut egui::Ui) {
+        let desired_size = ui.spacing().interact_size.x * egui::vec2(self.game_settings.width as f32, self.game_settings.height as f32);
+        let (rect, _) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+
+        let revealed_color =  Color32::GRAY;
+        let border_color = Color32::DARK_GRAY;
+
+        ui.painter().rect(
+            rect,
+            1.0,
+            revealed_color,
+            Stroke::new(1.0, border_color),
+        );
     }
 
     fn game_board_ui(&mut self, ui: &mut egui::Ui, active: bool) {
