@@ -47,7 +47,7 @@ fn main() -> Result<(), eframe::Error> {
         viewport: egui::ViewportBuilder::default()
             .with_icon(load_icon())
             .with_inner_size(Vec2::new(settings.ui_width, settings.ui_height))
-            .with_resizable(true),
+            .with_resizable(false),
         vsync: true,
         multisampling: 0,
         depth_buffer: 0,
@@ -164,11 +164,11 @@ impl MinesOfRustApp {
             install_image_loaders(ctx);
             self.image_loaders_installed = true;
         }
-        println!(
-            "width: {}, height: {}",
-            ctx.available_rect().width(),
-            ctx.available_rect().height()
-        );
+        // println!(
+        //     "width: {}, height: {}",
+        //     ctx.available_rect().width(),
+        //     ctx.available_rect().height()
+        // );
 
         egui::TopBottomPanel::top("top_panel")
             .resizable(false)
