@@ -1,23 +1,24 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use std::process;
+use std::time::SystemTime;
+
+use anyhow::Result;
+use eframe::{egui, glow, Theme};
+use egui::{Color32, Key, KeyboardShortcut, Modifiers, Stroke, Vec2, ViewportCommand};
+use egui_extras::install_image_loaders;
+use itertools::iproduct;
+
+use enums::*;
+use minesweeper::*;
+use state::*;
+use toggle::*;
+
 mod constants;
 mod enums;
 mod minesweeper;
 mod state;
 mod toggle;
-
-use anyhow::Result;
-use enums::*;
-use minesweeper::*;
-use state::*;
-use std::process;
-use toggle::*;
-
-use eframe::{egui, glow, Theme};
-use egui::{Color32, Key, KeyboardShortcut, Modifiers, Stroke, Vec2, ViewportCommand};
-use egui_extras::install_image_loaders;
-use itertools::iproduct;
-use std::time::SystemTime;
 
 fn now() -> f64 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
@@ -45,10 +46,7 @@ fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_icon(load_icon())
-            .with_inner_size(Vec2::new(
-                settings.ui_width,
-                settings.ui_height,
-            ))
+            .with_inner_size(Vec2::new(settings.ui_width, settings.ui_height))
             .with_resizable(true),
         vsync: true,
         multisampling: 0,
@@ -63,17 +61,14 @@ fn main() -> Result<(), eframe::Error> {
     };
 
     let app = Box::new(MinesOfRustApp {
-        gameboard: GameBoard::new(
-            settings.width,
-            settings.height,
-        ),
+        gameboard: GameBoard::new(settings.width, settings.height),
         state,
         image_loaders_installed: false,
         detonated_on: None,
         game_state: GameState::NotStarted,
         game_started: 0.0,
         game_finished: 0.0,
-        game_settings: settings
+        game_settings: settings,
     });
 
     eframe::run_native("Mines of Rust", options, Box::new(|_cc| app))
@@ -119,10 +114,7 @@ impl MinesOfRustApp {
     }
 
     fn reset_new_game(&mut self, ctx: &egui::Context) -> Result<(), Error> {
-        self.gameboard = GameBoard::new(
-            self.game_settings.width,
-            self.game_settings.height,
-        );
+        self.gameboard = GameBoard::new(self.game_settings.width, self.game_settings.height);
         self.game_state = GameState::NotStarted;
         self.detonated_on = None;
         self.game_started = now();
@@ -254,13 +246,13 @@ impl MinesOfRustApp {
                 self.gameboard.num_mines
             ));
 
-            let s = if self.game_state == GameState::Playing && self.gameboard.is_loss_configuration()
+            let s = if self.game_state == GameState::Playing
+                && self.gameboard.is_loss_configuration()
             {
                 self.game_state = GameState::EndedLoss;
                 self.game_finished = now();
                 "".to_string()
-            } else if self.game_state == GameState::Playing
-                && self.gameboard.is_win_configuration()
+            } else if self.game_state == GameState::Playing && self.gameboard.is_win_configuration()
             {
                 self.game_state = GameState::EndedWin;
                 self.gameboard.flag_all_mines();
@@ -271,23 +263,16 @@ impl MinesOfRustApp {
             } else if self.game_state == GameState::Paused {
                 format!("Time: {:.2}", self.game_started)
             } else if self.game_state.game_ended() {
-                format!(
-                    "Time: {:.2}",
-                    self.game_finished - self.game_started
-                )
+                format!("Time: {:.2}", self.game_finished - self.game_started)
             } else {
                 "".to_string()
             };
             ui.heading(s);
 
-            if self.game_state == GameState::Playing {
-                if ui.button("Pause").clicked() {
-                    self.pause_game();
-                }
-            } else if self.game_state == GameState::Paused {
-                if ui.button("Resume").clicked() {
-                    self.resume_game();
-                }
+            if self.game_state == GameState::Playing && ui.button("Pause").clicked() {
+                self.pause_game();
+            } else if self.game_state == GameState::Paused && ui.button("Resume").clicked() {
+                self.resume_game();
             }
         });
     }
@@ -301,7 +286,6 @@ impl MinesOfRustApp {
         self.game_state = GameState::Playing;
         self.game_started = now() - self.game_started;
     }
-
 
     fn options_ui(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
         egui::Grid::new("app_options")
@@ -349,38 +333,37 @@ impl MinesOfRustApp {
     }
 
     /// Returns the first found Explosion in a list of cascaded play results
-    fn first_losing_square_of_vec(play_result:&[PlayResult]) -> Option<Coordinate> {
+    fn first_losing_square_of_vec(play_result: &[PlayResult]) -> Option<Coordinate> {
         for r in play_result {
-            match r {
-                PlayResult::Explosion(c) => return Some(c.clone()),
-                _ => {}
-            };
+            if let PlayResult::Explosion(c) = r {
+                return Some(c.clone());
+            }
         }
         None
     }
 
     /// Returns the first found Explosion in either an explicit explosion or a cascaded play result
-    fn first_losing_square(play_result:&PlayResult) -> Option<Coordinate> {
+    fn first_losing_square(play_result: &PlayResult) -> Option<Coordinate> {
         match play_result {
             PlayResult::Explosion(c) => Some(c.clone()),
-            PlayResult::CascadedReveal(r) => MinesOfRustApp::first_losing_square_of_vec(&r),
-            _ => None
+            PlayResult::CascadedReveal(r) => MinesOfRustApp::first_losing_square_of_vec(r),
+            _ => None,
         }
     }
 
     fn game_board_paused_ui(&mut self, ui: &mut egui::Ui) {
-        let desired_size = ui.spacing().interact_size.x * egui::vec2(self.game_settings.width as f32, self.game_settings.height as f32);
+        let desired_size = ui.spacing().interact_size.x
+            * egui::vec2(
+                self.game_settings.width as f32,
+                self.game_settings.height as f32,
+            );
         let (rect, _) = ui.allocate_exact_size(desired_size, egui::Sense::click());
 
-        let revealed_color =  Color32::GRAY;
+        let revealed_color = Color32::GRAY;
         let border_color = Color32::DARK_GRAY;
 
-        ui.painter().rect(
-            rect,
-            1.0,
-            revealed_color,
-            Stroke::new(1.0, border_color),
-        );
+        ui.painter()
+            .rect(rect, 1.0, revealed_color, Stroke::new(1.0, border_color));
     }
 
     fn game_board_ui(&mut self, ui: &mut egui::Ui, active: bool) {
@@ -416,7 +399,7 @@ impl MinesOfRustApp {
                         && self.state.left_click_chord
                     {
                         Some(RevealType::RevealChord)
-                    } else if  active && resp.clicked_by(egui::PointerButton::Middle) {
+                    } else if active && resp.clicked_by(egui::PointerButton::Middle) {
                         Some(RevealType::Chord)
                     } else if resp.clicked_by(egui::PointerButton::Secondary) && active {
                         Some(RevealType::Flag)
@@ -425,12 +408,16 @@ impl MinesOfRustApp {
                     };
 
                     if let Some(p) = play_type {
-                        if let Some(c) = MinesOfRustApp::first_losing_square(&self.gameboard.play(x, y, p).expect("Failed to play desired move")) {
+                        if let Some(c) = MinesOfRustApp::first_losing_square(
+                            &self
+                                .gameboard
+                                .play(x, y, p)
+                                .expect("Failed to play desired move"),
+                        ) {
                             println!("Detonated on {:?}", c);
                             self.detonated_on = Some(c.clone());
                         }
                     }
-
 
                     if x == self.gameboard.width - 1 {
                         ui.end_row();
@@ -454,20 +441,30 @@ impl MinesOfRustApp {
         response
     }
 
-    fn square_ui(&self, ui: &mut egui::Ui, sqr: &Square, active:bool, is_detonated:bool) -> egui::Response {
+    fn square_ui(
+        &self,
+        ui: &mut egui::Ui,
+        sqr: &Square,
+        active: bool,
+        is_detonated: bool,
+    ) -> egui::Response {
         let desired_size = (ui.spacing().interact_size.x) * egui::vec2(1.0, 1.0);
         let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
 
-        let unrevealed_color = if active && response.clicked() { Color32::WHITE } else { Color32::LIGHT_BLUE };
-        let revealed_color = if is_detonated { Color32::GOLD } else { Color32::GRAY };
-        let border_color = Color32::DARK_GRAY ;
+        let unrevealed_color = if active && response.clicked() {
+            Color32::WHITE
+        } else {
+            Color32::LIGHT_BLUE
+        };
+        let revealed_color = if is_detonated {
+            Color32::GOLD
+        } else {
+            Color32::GRAY
+        };
+        let border_color = Color32::DARK_GRAY;
 
-        ui.painter().rect(
-            rect,
-            1.0,
-            revealed_color,
-            Stroke::new(1.0, border_color),
-        );
+        ui.painter()
+            .rect(rect, 1.0, revealed_color, Stroke::new(1.0, border_color));
 
         // Note: These are insufficient.
         // Playing
@@ -493,12 +490,8 @@ impl MinesOfRustApp {
         if sqr.is_mine() && (sqr.is_revealed || self.game_state == GameState::EndedLoss) {
             egui::Image::new(egui::include_image!("../assets/mine.png")).paint_at(ui, rect);
         } else if sqr.is_flagged {
-            ui.painter().rect(
-                rect,
-                1.0,
-                unrevealed_color,
-                Stroke::new(1.0, border_color),
-            );
+            ui.painter()
+                .rect(rect, 1.0, unrevealed_color, Stroke::new(1.0, border_color));
             egui::Image::new(egui::include_image!("../assets/flag.png")).paint_at(ui, rect);
         } else if sqr.is_revealed {
             match sqr.numeral {
@@ -513,12 +506,8 @@ impl MinesOfRustApp {
                 _ => {}
             };
         } else {
-            ui.painter().rect(
-                rect,
-                1.0,
-                unrevealed_color,
-                Stroke::new(1.0, border_color),
-            );
+            ui.painter()
+                .rect(rect, 1.0, unrevealed_color, Stroke::new(1.0, border_color));
         }
 
         response

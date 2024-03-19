@@ -50,11 +50,11 @@ impl GameSettings {
         }
     }
 
-    pub fn settings_for_difficulty(difficulty:&GameDifficulty) -> Self {
+    pub fn settings_for_difficulty(difficulty: &GameDifficulty) -> Self {
         match difficulty {
             GameDifficulty::Beginner => GameSettings::beginner(),
             GameDifficulty::Intermediate => GameSettings::intermediate(),
-            GameDifficulty::Expert => GameSettings::expert()
+            GameDifficulty::Expert => GameSettings::expert(),
         }
     }
 }
@@ -63,7 +63,7 @@ impl GameSettings {
 pub struct AppState {
     pub difficulty: GameDifficulty,
     pub left_click_chord: bool,
-    pub dark_mode: bool
+    pub dark_mode: bool,
 }
 
 impl Default for AppState {
@@ -71,7 +71,7 @@ impl Default for AppState {
         Self {
             difficulty: GameDifficulty::Intermediate,
             left_click_chord: false,
-            dark_mode: true
+            dark_mode: true,
         }
     }
 }

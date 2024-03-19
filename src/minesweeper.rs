@@ -87,6 +87,14 @@ impl Coordinate {
     pub fn matches(&self, x: u32, y: u32) -> bool {
         self.x == x && self.y == y
     }
+
+    pub fn near(&self, coord: &Coordinate) -> bool {
+        let d = ((self.x as f32 - coord.x as f32).powf(2.0)
+            + (self.y as f32 - coord.y as f32).powf(2.0))
+        .sqrt();
+        // println!("Distance between {:?} and {:?}: {}", self, coord, d);
+        d <= 1.5
+    }
 }
 
 #[derive(Debug)]
@@ -106,8 +114,6 @@ pub enum PlayResult {
     Revealed(Coordinate),
     CascadedReveal(Vec<PlayResult>),
 }
-
-
 
 #[derive(Debug, Clone)]
 /// Representation of a minesweeper game board
@@ -163,6 +169,11 @@ impl GameBoard {
         y * self.width + x
     }
 
+    fn coordinate_to_idx(&self, coord: &Coordinate) -> u32 {
+        self.xy_to_idx(coord.x, coord.y)
+    }
+
+    #[allow(dead_code)]
     fn idx_to_xy(&self, idx: u32) -> Result<Coordinate, Error> {
         if idx as usize > self.squares.len() - 1 {
             return Err(Error::IndexOutOfBounds);
@@ -188,6 +199,10 @@ impl GameBoard {
         } else {
             self.get_square_by_idx(self.xy_to_idx(x, y))
         }
+    }
+
+    pub fn get_square_by_coordinate(&self, coord: &Coordinate) -> Result<Square, Error> {
+        self.get_square(coord.x, coord.y)
     }
 
     /// Determines whether a square contains a mine, allowing for negative
@@ -257,6 +272,13 @@ impl GameBoard {
         }
     }
 
+    fn gen_random_square_coordinates(&self) -> Coordinate {
+        Coordinate {
+            x: rand::thread_rng().gen_range(0..self.width),
+            y: rand::thread_rng().gen_range(0..self.height),
+        }
+    }
+
     pub fn populate_mines_around(
         &mut self,
         num_mines: u32,
@@ -269,17 +291,18 @@ impl GameBoard {
 
             let mut mines_placed = 0;
             while mines_placed < num_mines {
-                let random_idx = rand::thread_rng().gen_range(0..self.squares.len() - 1);
+                let random_coord = self.gen_random_square_coordinates();
 
                 if let Some(kc) = &keep_clear {
-                    if !self.get_square_by_idx(random_idx as u32)?.is_mine()
-                        && *kc != self.idx_to_xy(random_idx as u32)?
-                    {
-                        self.squares[random_idx] = Square::default_mine();
+                    let sqr = self.get_square_by_coordinate(&random_coord)?;
+                    if !kc.near(&random_coord) && !sqr.is_mine() {
+                        let idx = self.coordinate_to_idx(&random_coord);
+                        self.squares[idx as usize] = Square::default_mine();
                         mines_placed += 1;
                     }
-                } else if !self.get_square_by_idx(random_idx as u32)?.is_mine() {
-                    self.squares[random_idx] = Square::default_mine();
+                } else {
+                    let idx = self.coordinate_to_idx(&random_coord);
+                    self.squares[idx as usize] = Square::default_mine();
                     mines_placed += 1;
                 }
             }
@@ -391,7 +414,8 @@ impl GameBoard {
             return PlayResult::NoChange;
         }
 
-        self.reveal(x as u32, y as u32).unwrap_or_else(|_| PlayResult::NoChange)
+        self.reveal(x as u32, y as u32)
+            .unwrap_or(PlayResult::NoChange)
     }
 
     /// Determine whether a given square can be chorded.
@@ -478,7 +502,7 @@ impl GameBoard {
             RevealType::Flag => self.flag(x, y),
             RevealType::Reveal => self.reveal(x, y),
             RevealType::Chord => self.chord(x, y),
-            RevealType::RevealChord => self.revealchord(x, y)
+            RevealType::RevealChord => self.revealchord(x, y),
         }
     }
 
@@ -809,4 +833,21 @@ fn test_simple_game_2() -> Result<(), Error> {
     );
 
     Ok(())
+}
+
+#[test]
+fn test_coordinate_is_near() {
+    let center = Coordinate { x: 5, y: 5 };
+
+    assert!(center.near(&Coordinate { x: 4, y: 4 })); // Top Left
+    assert!(center.near(&Coordinate { x: 5, y: 4 })); // Top
+    assert!(center.near(&Coordinate { x: 6, y: 4 })); // Top Right
+    assert!(center.near(&Coordinate { x: 4, y: 5 })); // Left
+    assert!(center.near(&Coordinate { x: 5, y: 5 })); // Same
+    assert!(center.near(&Coordinate { x: 6, y: 5 })); // Right
+    assert!(center.near(&Coordinate { x: 4, y: 6 })); // Bottom Left
+    assert!(center.near(&Coordinate { x: 5, y: 6 })); // Bottom
+    assert!(center.near(&Coordinate { x: 6, y: 6 })); // Bottom Right
+
+    assert!(!center.near(&Coordinate { x: 3, y: 5 })); // Left left
 }
