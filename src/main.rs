@@ -195,6 +195,13 @@ impl MinesOfRustApp {
                     println!("Boss can see screen. Ctrl+q is pressed, exiting");
                     process::exit(0);
                 }
+                if ui.input_mut(|i| {
+                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::P))
+                }) {
+                    println!("Ctrl+q is pressed, toggling pause status");
+                    self.toggle_pause_state();
+                }
+
                 ui.vertical_centered(|ui| {
                     if self.face_ui(ui).clicked() {
                         self.reset_new_game(ctx).expect("Error building new game");
@@ -275,6 +282,14 @@ impl MinesOfRustApp {
                 self.resume_game();
             }
         });
+    }
+
+    fn toggle_pause_state(&mut self) {
+        if self.game_state == GameState::Playing {
+            self.pause_game();
+        } else if self.game_state == GameState::Paused {
+            self.resume_game();
+        }
     }
 
     fn pause_game(&mut self) {

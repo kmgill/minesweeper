@@ -19,6 +19,7 @@ whenever I get bored enough to do it.
 * *ctrl+n* - New Game
 * *ctrl+r* - Reset game (same game board)
 * *ctrl+q* - Exit
+* *ctrl+p* - Pause/Resume
 
 ## Building from source
 
