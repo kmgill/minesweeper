@@ -8,14 +8,18 @@ use eframe::{egui, glow, Theme};
 use egui::{Key, KeyboardShortcut, Modifiers, Pos2, Stroke, Vec2, ViewportCommand};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
+use whoami;
 
 use enums::*;
 use minesweeper::*;
 use state::*;
 use toggle::*;
 
+use crate::leader::LeaderBoards;
+
 mod constants;
 mod enums;
+mod leader;
 mod minesweeper;
 mod state;
 mod toggle;
@@ -37,10 +41,12 @@ struct MinesOfRustApp {
     game_started: f64,
     game_finished: f64,
     game_settings: GameSettings,
+    leaderboards: LeaderBoards,
 }
 
 fn main() -> Result<(), eframe::Error> {
-    let state = AppState::load_from_userhome().unwrap_or_else(|_| AppState::default());
+    let state = AppState::load_from_userhome().unwrap_or(AppState::default());
+    let leaderboards = LeaderBoards::load_from_userhome().unwrap_or(LeaderBoards::default());
     let settings = GameSettings::settings_for_difficulty(&state.difficulty);
 
     let options = eframe::NativeOptions {
@@ -69,6 +75,7 @@ fn main() -> Result<(), eframe::Error> {
         game_started: 0.0,
         game_finished: 0.0,
         game_settings: settings,
+        leaderboards,
     });
 
     eframe::run_native("Mines of Rust", options, Box::new(|_cc| app))
@@ -100,6 +107,7 @@ impl eframe::App for MinesOfRustApp {
 
     fn on_exit(&mut self, _gl: Option<&glow::Context>) {
         self.state.save_to_userhome();
+        self.leaderboards.save_to_userhome();
     }
 }
 
@@ -261,9 +269,15 @@ impl MinesOfRustApp {
                 "".to_string()
             } else if self.game_state == GameState::Playing && self.gameboard.is_win_configuration()
             {
+                // You win!
                 self.game_state = GameState::EndedWin;
                 self.gameboard.flag_all_mines();
                 self.game_finished = now();
+                self.leaderboards.add(
+                    self.state.difficulty.clone(),
+                    &whoami::realname(), // Do this until I write a dialog asking for the real name
+                    self.game_finished - self.game_started,
+                );
                 "".to_string()
             } else if self.game_state == GameState::Playing {
                 format!("Time: {:.2}", now() - self.game_started)
@@ -501,6 +515,7 @@ impl MinesOfRustApp {
             visuals_off.bg_fill
         };
         let border_color = constants::COLOR_BORDER;
+        let misflagged_color = constants::COLOR_MISFLAGGED;
 
         ui.painter()
             .rect(rect, 0.0, revealed_color, Stroke::new(0.5, border_color));
@@ -526,8 +541,12 @@ impl MinesOfRustApp {
         //      Unrevealed flagged
         //      Revealed numeral
         //      Revealed blank
-        if sqr.is_mine() && (sqr.is_revealed || self.game_state == GameState::EndedLoss) {
+        if sqr.is_mine() && !sqr.is_flagged && self.game_state == GameState::EndedLoss {
             egui::Image::new(egui::include_image!("../assets/mine.png")).paint_at(ui, rect);
+        } else if sqr.is_flagged && !sqr.is_mine() && self.game_state == GameState::EndedLoss {
+            ui.painter()
+                .rect(rect, 0.0, misflagged_color, Stroke::new(0.5, border_color));
+            egui::Image::new(egui::include_image!("../assets/flag.png")).paint_at(ui, rect);
         } else if sqr.is_flagged && !opaque {
             ui.painter()
                 .rect(rect, 0.0, unrevealed_color, Stroke::new(0.5, border_color));

@@ -23,3 +23,4 @@ pub const COLOR_UNREVEALED: Color32 = Color32::from_rgb(0, 92, 128);
 pub const COLOR_BORDER: Color32 = Color32::from_rgb(27, 27, 27);
 pub const COLOR_DETONATED: Color32 = Color32::GOLD;
 pub const COLOR_REVEALED: Color32 = Color32::DARK_GRAY;
+pub const COLOR_MISFLAGGED: Color32 = Color32::from_rgb(255, 188, 188);

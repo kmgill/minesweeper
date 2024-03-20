@@ -28,6 +28,7 @@ serde = { version = "1.0.125", features = ["derive"] }
 serde_json = "1.0.64"
 dirs = "5.0.0"
 toml = "0.8.2"
+whoami = "1.5.1"
 
 [package.metadata.deb]
 maintainer = "Kevin M. Gill <apoapsys@gmail.com>"
