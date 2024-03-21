@@ -182,7 +182,7 @@ impl MinesOfRustApp {
                     .show(ui, |ui| {
                         egui::Grid::new("leaderboard")
                             .num_columns(2)
-                            .spacing([0.0, 0.0])
+                            .spacing([50.0, 5.0])
                             .striped(true)
                             .show(ui, |ui| {
                                 self.leaderboards.beginner.entries.iter().for_each(|e| {
@@ -198,7 +198,7 @@ impl MinesOfRustApp {
                     .show(ui, |ui| {
                         egui::Grid::new("leaderboard")
                             .num_columns(2)
-                            .spacing([0.0, 0.0])
+                            .spacing([50.0, 5.0])
                             .striped(true)
                             .show(ui, |ui| {
                                 self.leaderboards.intermediate.entries.iter().for_each(|e| {
@@ -214,7 +214,7 @@ impl MinesOfRustApp {
                     .show(ui, |ui| {
                         egui::Grid::new("leaderboard")
                             .num_columns(2)
-                            .spacing([0.0, 0.0])
+                            .spacing([50.0, 5.0])
                             .striped(true)
                             .show(ui, |ui| {
                                 self.leaderboards.expert.entries.iter().for_each(|e| {
