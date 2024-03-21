@@ -5,10 +5,9 @@ use std::time::SystemTime;
 
 use anyhow::Result;
 use eframe::{egui, glow, Theme};
-use egui::{Key, KeyboardShortcut, Modifiers, Pos2, Stroke, Vec2, ViewportCommand};
+use egui::{Key, KeyboardShortcut, Modifiers, Pos2, RichText, Stroke, Vec2, ViewportCommand};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
-use whoami;
 
 use enums::*;
 use minesweeper::*;
@@ -23,6 +22,9 @@ mod leader;
 mod minesweeper;
 mod state;
 mod toggle;
+
+/// Settings as 'true' will allow the window to be resized and will print the dimensions to the console.
+const DBG_WINDOW_RESIZABLE: bool = false;
 
 fn now() -> f64 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
@@ -42,18 +44,19 @@ struct MinesOfRustApp {
     game_finished: f64,
     game_settings: GameSettings,
     leaderboards: LeaderBoards,
+    leaderboard_visible: bool,
 }
 
 fn main() -> Result<(), eframe::Error> {
-    let state = AppState::load_from_userhome().unwrap_or(AppState::default());
-    let leaderboards = LeaderBoards::load_from_userhome().unwrap_or(LeaderBoards::default());
+    let state = AppState::load_from_userhome().unwrap_or_default();
+    let leaderboards = LeaderBoards::load_from_userhome().unwrap_or_default();
     let settings = GameSettings::settings_for_difficulty(&state.difficulty);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_icon(load_icon())
             .with_inner_size(Vec2::new(settings.ui_width, settings.ui_height))
-            .with_resizable(false),
+            .with_resizable(DBG_WINDOW_RESIZABLE),
         vsync: true,
         multisampling: 0,
         depth_buffer: 0,
@@ -76,6 +79,7 @@ fn main() -> Result<(), eframe::Error> {
         game_finished: 0.0,
         game_settings: settings,
         leaderboards,
+        leaderboard_visible: false,
     });
 
     eframe::run_native("Mines of Rust", options, Box::new(|_cc| app))
@@ -167,16 +171,79 @@ impl MinesOfRustApp {
         Ok(())
     }
 
+    fn leaderboard_ui(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Leaderboard")
+            .open(&mut self.leaderboard_visible)
+            .vscroll(true)
+            .hscroll(true)
+            .show(ctx, |ui| {
+                egui::CollapsingHeader::new("Beginner")
+                    .default_open(self.state.difficulty == GameDifficulty::Beginner)
+                    .show(ui, |ui| {
+                        egui::Grid::new("leaderboard")
+                            .num_columns(2)
+                            .spacing([0.0, 0.0])
+                            .striped(true)
+                            .show(ui, |ui| {
+                                self.leaderboards.beginner.entries.iter().for_each(|e| {
+                                    ui.label(&e.player_name);
+                                    ui.label(format!("{:.2}", e.time));
+                                    ui.end_row();
+                                });
+                            });
+                    });
+
+                egui::CollapsingHeader::new("Intermediate")
+                    .default_open(self.state.difficulty == GameDifficulty::Intermediate)
+                    .show(ui, |ui| {
+                        egui::Grid::new("leaderboard")
+                            .num_columns(2)
+                            .spacing([0.0, 0.0])
+                            .striped(true)
+                            .show(ui, |ui| {
+                                self.leaderboards.intermediate.entries.iter().for_each(|e| {
+                                    ui.label(&e.player_name);
+                                    ui.label(format!("{:.2}", e.time));
+                                    ui.end_row();
+                                });
+                            });
+                    });
+
+                egui::CollapsingHeader::new("Expert")
+                    .default_open(self.state.difficulty == GameDifficulty::Expert)
+                    .show(ui, |ui| {
+                        egui::Grid::new("leaderboard")
+                            .num_columns(2)
+                            .spacing([0.0, 0.0])
+                            .striped(true)
+                            .show(ui, |ui| {
+                                self.leaderboards.expert.entries.iter().for_each(|e| {
+                                    ui.label(&e.player_name);
+                                    ui.label(format!("{:.2}", e.time));
+                                    ui.end_row();
+                                });
+                            });
+                    });
+            });
+    }
+
     fn on_update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) -> Result<(), Error> {
         if !self.image_loaders_installed {
             install_image_loaders(ctx);
             self.image_loaders_installed = true;
         }
-        // println!(
-        //     "width: {}, height: {}",
-        //     ctx.available_rect().width(),
-        //     ctx.available_rect().height()
-        // );
+
+        if self.leaderboard_visible {
+            self.leaderboard_ui(ctx);
+        }
+
+        if DBG_WINDOW_RESIZABLE {
+            println!(
+                "width: {}, height: {}",
+                ctx.available_rect().width(),
+                ctx.available_rect().height()
+            );
+        }
 
         egui::TopBottomPanel::top("top_panel")
             .resizable(false)
@@ -229,11 +296,11 @@ impl MinesOfRustApp {
 
         egui::TopBottomPanel::bottom("bottom_panel")
             .resizable(false)
-            .min_height(50.0)
+            .min_height(165.0)
             .show(ctx, |ui| {
                 ui.vertical_centered(|ui| {
                     egui::Grid::new("app_options")
-                        .num_columns(2)
+                        .num_columns(3)
                         .spacing([10.0, 50.0])
                         .striped(false)
                         .show(ui, |ui| {
@@ -244,6 +311,9 @@ impl MinesOfRustApp {
                             //    });
                             self.status_ui(ui);
                         });
+                    if ui.button("Leaderboard").clicked() {
+                        self.leaderboard_visible = true;
+                    }
                 });
             });
         if self.game_state == GameState::Playing {
@@ -255,11 +325,12 @@ impl MinesOfRustApp {
     fn status_ui(&mut self, ui: &mut egui::Ui) {
         ui.vertical_centered(|ui| {
             ui.heading("");
-            ui.heading(format!(
+            let s = format!(
                 "{} of {}",
                 self.gameboard.num_flags(),
                 self.gameboard.num_mines
-            ));
+            );
+            ui.add(egui::Label::new(<String as Into<RichText>>::into(s).heading()).wrap(false));
 
             let s = if self.game_state == GameState::Playing
                 && self.gameboard.is_loss_configuration()
@@ -288,7 +359,8 @@ impl MinesOfRustApp {
             } else {
                 "".to_string()
             };
-            ui.heading(s);
+
+            ui.add(egui::Label::new(<String as Into<RichText>>::into(s).heading()).wrap(false));
 
             if self.game_state == GameState::Playing && ui.button("Pause").clicked() {
                 self.pause_game();

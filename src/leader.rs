@@ -50,6 +50,7 @@ pub struct LeaderBoards {
 }
 
 impl LeaderBoards {
+    #[allow(dead_code)]
     pub fn leaderboard_for_level(&self, level: GameDifficulty) -> LeaderBoard {
         match level {
             GameDifficulty::Beginner => &self.beginner,
