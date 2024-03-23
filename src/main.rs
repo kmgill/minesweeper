@@ -5,7 +5,7 @@ use std::time::SystemTime;
 
 use anyhow::Result;
 use eframe::{egui, glow, Theme};
-use egui::{Key, KeyboardShortcut, Modifiers, Pos2, RichText, Stroke, Vec2, ViewportCommand};
+use egui::{Color32, Key, KeyboardShortcut, Modifiers, Pos2, RichText, Stroke, Vec2, ViewportCommand};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
 
@@ -188,6 +188,7 @@ impl MinesOfRustApp {
                                 self.leaderboards.beginner.entries.iter().for_each(|e| {
                                     ui.label(&e.player_name);
                                     ui.label(format!("{:.2}", e.time));
+                                    ui.label(format!("{}", e.date.format("%Y-%m-%d %H:%M")));
                                     ui.end_row();
                                 });
                             });
@@ -197,13 +198,14 @@ impl MinesOfRustApp {
                     .default_open(self.state.difficulty == GameDifficulty::Intermediate)
                     .show(ui, |ui| {
                         egui::Grid::new("leaderboard")
-                            .num_columns(2)
+                            .num_columns(3)
                             .spacing([50.0, 5.0])
                             .striped(true)
                             .show(ui, |ui| {
                                 self.leaderboards.intermediate.entries.iter().for_each(|e| {
                                     ui.label(&e.player_name);
                                     ui.label(format!("{:.2}", e.time));
+                                    ui.label(format!("{}", e.date.format("%Y-%m-%d %H:%M")));
                                     ui.end_row();
                                 });
                             });
@@ -220,6 +222,7 @@ impl MinesOfRustApp {
                                 self.leaderboards.expert.entries.iter().for_each(|e| {
                                     ui.label(&e.player_name);
                                     ui.label(format!("{:.2}", e.time));
+                                    ui.label(format!("{}", e.date.format("%Y-%m-%d %H:%M")));
                                     ui.end_row();
                                 });
                             });
@@ -581,13 +584,24 @@ impl MinesOfRustApp {
         let unrevealed_color = visuals_on.bg_fill; //constants::COLOR_UNREVEALED;
         let revealed_color = if is_detonated {
             constants::COLOR_DETONATED
-        } else if opaque {
-            visuals_on.bg_fill
         } else {
             visuals_off.bg_fill
         };
         let border_color = constants::COLOR_BORDER;
         let misflagged_color = constants::COLOR_MISFLAGGED;
+
+        let opaque_color = Color32::from_rgba_unmultiplied(
+            unrevealed_color.r(),
+            unrevealed_color.g(),
+            unrevealed_color.b(),
+            if mouse_distance < 1.0 {
+                0
+            } else if mouse_distance < 3.0 {
+                140
+            } else {
+                255
+            }
+        );
 
         ui.painter()
             .rect(rect, 0.0, revealed_color, Stroke::new(0.5, border_color));
@@ -619,11 +633,11 @@ impl MinesOfRustApp {
             ui.painter()
                 .rect(rect, 0.0, misflagged_color, Stroke::new(0.5, border_color));
             egui::Image::new(egui::include_image!("../assets/flag.png")).paint_at(ui, rect);
-        } else if sqr.is_flagged && !opaque {
+        } else if sqr.is_flagged  {
             ui.painter()
                 .rect(rect, 0.0, unrevealed_color, Stroke::new(0.5, border_color));
             egui::Image::new(egui::include_image!("../assets/flag.png")).paint_at(ui, rect);
-        } else if sqr.is_revealed && !opaque {
+        } else if sqr.is_revealed  {
             match sqr.numeral {
                 1 => egui::Image::new(egui::include_image!("../assets/1.png")).paint_at(ui, rect),
                 2 => egui::Image::new(egui::include_image!("../assets/2.png")).paint_at(ui, rect),
@@ -640,6 +654,10 @@ impl MinesOfRustApp {
                 .rect(rect, 0.0, unrevealed_color, Stroke::new(0.5, border_color));
         }
 
+        if opaque && self.game_state == GameState::Playing {
+            ui.painter()
+                .rect(rect, 0.0, opaque_color, Stroke::new(0.5, border_color));
+        }
         response
     }
 }

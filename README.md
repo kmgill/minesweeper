@@ -21,6 +21,17 @@ whenever I get bored enough to do it.
 * *ctrl+q* - Exit
 * *ctrl+p* - Pause/Resume
 
+## Features:
+
+* Three modes of difficulty: Beginner, Intermediate, and Expert.
+* Optional chord on left (primary) mouse click.
+* Light / Dark modes
+* Fog of War where only a small window of the field is visible at a time:
+
+<p align="center">
+  <img src="assets/minesofrust_screenshot_fow.jpg" width="300">
+</p>
+
 ## Building from source
 
 A working Rust (https://www.rust-lang.org/) installation is required for building. Mines of Rust targets the 2021
