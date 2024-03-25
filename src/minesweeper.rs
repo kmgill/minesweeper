@@ -70,7 +70,7 @@ impl Square {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct Coordinate {
     pub x: u32,
     pub y: u32,
@@ -98,8 +98,9 @@ impl Coordinate {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum RevealType {
+    #[default]
     Reveal,
     RevealChord,
     Chord,

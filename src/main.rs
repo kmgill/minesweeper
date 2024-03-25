@@ -5,7 +5,9 @@ use std::time::SystemTime;
 
 use anyhow::Result;
 use eframe::{egui, glow, Theme};
-use egui::{Color32, Key, KeyboardShortcut, Modifiers, Pos2, RichText, Stroke, Vec2, ViewportCommand};
+use egui::{
+    Color32, Key, KeyboardShortcut, Modifiers, Pos2, RichText, Stroke, Vec2, ViewportCommand,
+};
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
 
@@ -26,6 +28,72 @@ mod toggle;
 /// Settings as 'true' will allow the window to be resized and will print the dimensions to the console.
 const DBG_WINDOW_RESIZABLE: bool = false;
 
+#[derive(Debug, Clone, Default)]
+struct PlayEntry {
+    #[allow(dead_code)]
+    coord: Coordinate,
+    play_type: RevealType,
+}
+
+#[derive(Debug, Clone, Default)]
+struct PlayList {
+    pub list: Vec<PlayEntry>,
+}
+
+impl PlayList {
+    pub fn push(&mut self, entry: PlayEntry) {
+        self.list.push(entry);
+    }
+
+    pub fn clear(&mut self) {
+        self.list.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.list.len()
+    }
+
+    pub fn clicks(&self) -> u32 {
+        self.list.len() as u32
+    }
+
+    pub fn reveals(&self) -> u32 {
+        self.list
+            .iter()
+            .map(|e| match e.play_type {
+                RevealType::Reveal | RevealType::RevealChord => 1,
+                _ => 0,
+            })
+            .collect::<Vec<u32>>()
+            .iter()
+            .sum()
+    }
+
+    pub fn flagged(&self) -> u32 {
+        self.list
+            .iter()
+            .map(|e| match e.play_type {
+                RevealType::Flag => 1,
+                _ => 0,
+            })
+            .collect::<Vec<u32>>()
+            .iter()
+            .sum()
+    }
+
+    pub fn chords(&self) -> u32 {
+        self.list
+            .iter()
+            .map(|e| match e.play_type {
+                RevealType::Chord | RevealType::RevealChord => 1,
+                _ => 0,
+            })
+            .collect::<Vec<u32>>()
+            .iter()
+            .sum()
+    }
+}
+
 fn now() -> f64 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_secs_f64(),
@@ -45,6 +113,8 @@ struct MinesOfRustApp {
     game_settings: GameSettings,
     leaderboards: LeaderBoards,
     leaderboard_visible: bool,
+    gamestats_visible: bool,
+    plays: PlayList,
 }
 
 fn main() -> Result<(), eframe::Error> {
@@ -80,6 +150,8 @@ fn main() -> Result<(), eframe::Error> {
         game_settings: settings,
         leaderboards,
         leaderboard_visible: false,
+        gamestats_visible: false,
+        plays: PlayList::default(),
     });
 
     eframe::run_native("Mines of Rust", options, Box::new(|_cc| app))
@@ -127,6 +199,7 @@ impl MinesOfRustApp {
 
     fn reset_new_game(&mut self, ctx: &egui::Context) -> Result<(), Error> {
         self.gameboard = GameBoard::new(self.game_settings.width, self.game_settings.height);
+        self.plays.clear();
         self.game_state = GameState::NotStarted;
         self.detonated_on = None;
         self.game_started = now();
@@ -142,6 +215,7 @@ impl MinesOfRustApp {
     fn reset_existing_game(&mut self, _ctx: &egui::Context) -> Result<(), Error> {
         self.gameboard.reset_existing();
 
+        self.plays.clear();
         self.game_state = GameState::NotStarted;
         self.game_started = now();
 
@@ -230,6 +304,36 @@ impl MinesOfRustApp {
             });
     }
 
+    fn gamestats_ui(&mut self, ctx: &egui::Context) {
+        egui::Window::new("Game Stats")
+            .open(&mut self.gamestats_visible)
+            .vscroll(true)
+            .hscroll(true)
+            .show(ctx, |ui| {
+                egui::Grid::new("leaderboard")
+                    .num_columns(2)
+                    .spacing([50.0, 5.0])
+                    .striped(true)
+                    .show(ui, |ui| {
+                        ui.label("Reveal Clicks:");
+                        ui.label(format!("{}", self.plays.reveals()));
+                        ui.end_row();
+
+                        ui.label("Chord Clicks:");
+                        ui.label(format!("{}", self.plays.chords()));
+                        ui.end_row();
+
+                        ui.label("Flag Clicks:");
+                        ui.label(format!("{}", self.plays.flagged()));
+                        ui.end_row();
+
+                        ui.label("Total Clicks:");
+                        ui.label(format!("{}", self.plays.clicks()));
+                        ui.end_row();
+                    });
+            });
+    }
+
     fn on_update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) -> Result<(), Error> {
         if !self.image_loaders_installed {
             install_image_loaders(ctx);
@@ -238,6 +342,10 @@ impl MinesOfRustApp {
 
         if self.leaderboard_visible {
             self.leaderboard_ui(ctx);
+        }
+
+        if self.gamestats_visible {
+            self.gamestats_ui(ctx);
         }
 
         if DBG_WINDOW_RESIZABLE {
@@ -255,26 +363,26 @@ impl MinesOfRustApp {
                 self.state.dark_mode = ui.visuals().dark_mode; // I don't like having this here.
 
                 if ui.input_mut(|i| {
-                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::N))
+                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::N))
                 }) {
                     println!("ctrl+n is pressed, resetting game");
                     self.reset_new_game(ctx).expect("Error building new game");
                 }
                 if ui.input_mut(|i| {
-                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::R))
+                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::R))
                 }) {
                     println!("ctrl+r is pressed, resetting existing game");
                     self.reset_existing_game(ctx)
                         .expect("Error rebuilding game");
                 }
                 if ui.input_mut(|i| {
-                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::Q))
+                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::Q))
                 }) {
                     println!("Boss can see screen. Ctrl+q is pressed, exiting");
                     process::exit(0);
                 }
                 if ui.input_mut(|i| {
-                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::CTRL, Key::P))
+                    i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::P))
                 }) {
                     println!("Ctrl+q is pressed, toggling pause status");
                     self.toggle_pause_state();
@@ -314,9 +422,15 @@ impl MinesOfRustApp {
                             //    });
                             self.status_ui(ui);
                         });
-                    if ui.button("Leaderboard").clicked() {
-                        self.leaderboard_visible = true;
-                    }
+
+                    ui.horizontal_centered(|ui| {
+                        if ui.button("Leaderboard").clicked() {
+                            self.leaderboard_visible = true;
+                        }
+                        if ui.button("Game Stats").clicked() {
+                            self.gamestats_visible = true;
+                        }
+                    });
                 });
             });
         if self.game_state == GameState::Playing {
@@ -534,6 +648,13 @@ impl MinesOfRustApp {
                     };
 
                     if let Some(p) = play_type {
+                        self.plays.push(PlayEntry {
+                            play_type: p.clone(),
+                            coord: Coordinate { x, y },
+                        });
+
+                        println!("Plays: {}", self.plays.len());
+
                         if let Some(c) = MinesOfRustApp::first_losing_square(
                             &self
                                 .gameboard
@@ -600,7 +721,7 @@ impl MinesOfRustApp {
                 140
             } else {
                 255
-            }
+            },
         );
 
         ui.painter()
@@ -633,11 +754,11 @@ impl MinesOfRustApp {
             ui.painter()
                 .rect(rect, 0.0, misflagged_color, Stroke::new(0.5, border_color));
             egui::Image::new(egui::include_image!("../assets/flag.png")).paint_at(ui, rect);
-        } else if sqr.is_flagged  {
+        } else if sqr.is_flagged {
             ui.painter()
                 .rect(rect, 0.0, unrevealed_color, Stroke::new(0.5, border_color));
             egui::Image::new(egui::include_image!("../assets/flag.png")).paint_at(ui, rect);
-        } else if sqr.is_revealed  {
+        } else if sqr.is_revealed {
             match sqr.numeral {
                 1 => egui::Image::new(egui::include_image!("../assets/1.png")).paint_at(ui, rect),
                 2 => egui::Image::new(egui::include_image!("../assets/2.png")).paint_at(ui, rect),
