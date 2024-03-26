@@ -330,6 +330,21 @@ impl MinesOfRustApp {
                         ui.label("Total Clicks:");
                         ui.label(format!("{}", self.plays.clicks()));
                         ui.end_row();
+
+                        let num_sqrs_worked =
+                            self.gameboard.num_flags() + self.gameboard.num_revealed();
+                        ui.label("Squares Revealed + Flagged:");
+                        ui.label(format!("{}", num_sqrs_worked));
+                        ui.end_row();
+
+                        ui.label("Efficiency:");
+                        if num_sqrs_worked > 0 {
+                            ui.label(format!(
+                                "{:.2}%",
+                                (1.0 - self.plays.clicks() as f32 / num_sqrs_worked as f32) * 100.0
+                            ));
+                        }
+                        ui.end_row();
                     });
             });
     }
@@ -652,8 +667,6 @@ impl MinesOfRustApp {
                             play_type: p.clone(),
                             coord: Coordinate { x, y },
                         });
-
-                        println!("Plays: {}", self.plays.len());
 
                         if let Some(c) = MinesOfRustApp::first_losing_square(
                             &self

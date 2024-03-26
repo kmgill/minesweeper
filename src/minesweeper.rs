@@ -518,6 +518,17 @@ impl GameBoard {
             .sum::<u32>()
     }
 
+    pub fn num_revealed(&self) -> u32 {
+        self.squares
+            .clone()
+            .into_iter()
+            .map(|s| if s.is_revealed { 1 } else { 0 })
+            .collect::<Vec<u32>>()
+            .into_iter()
+            .sum::<u32>()
+    }
+
+
     // Don't cheat
     #[allow(dead_code)]
     pub fn flag_all_mines(&mut self) {
