@@ -65,7 +65,7 @@ impl GameSettings {
 pub struct AppState {
     pub difficulty: GameDifficulty,
     pub left_click_chord: bool,
-    pub dark_mode: bool,
+    pub theme: VisualTheme,
     pub fog_of_war: bool,
 }
 
@@ -74,7 +74,7 @@ impl Default for AppState {
         Self {
             difficulty: GameDifficulty::Intermediate,
             left_click_chord: false,
-            dark_mode: true,
+            theme: VisualTheme::Dark,
             fog_of_war: false,
         }
     }

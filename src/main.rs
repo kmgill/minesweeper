@@ -7,6 +7,7 @@ use anyhow::Result;
 use eframe::{egui, glow, Theme};
 use egui::{
     Color32, Key, KeyboardShortcut, Modifiers, Pos2, RichText, Stroke, Vec2, ViewportCommand,
+    Visuals,
 };
 use egui_extras::install_image_loaders;
 use itertools::iproduct;
@@ -133,7 +134,7 @@ fn main() -> Result<(), eframe::Error> {
         multisampling: 0,
         depth_buffer: 0,
         stencil_buffer: 0,
-        default_theme: if state.dark_mode {
+        default_theme: if state.theme == VisualTheme::Dark {
             Theme::Dark
         } else {
             Theme::Light
@@ -374,6 +375,11 @@ impl MinesOfRustApp {
             self.gamestats_ui(ctx);
         }
 
+        match self.state.theme {
+            VisualTheme::Dark => ctx.set_visuals(Visuals::dark()),
+            VisualTheme::Light => ctx.set_visuals(Visuals::light()),
+        }
+
         if DBG_WINDOW_RESIZABLE {
             println!(
                 "width: {}, height: {}",
@@ -386,7 +392,7 @@ impl MinesOfRustApp {
             .resizable(false)
             .min_height(50.0)
             .show(ctx, |ui| {
-                self.state.dark_mode = ui.visuals().dark_mode; // I don't like having this here.
+                // self.state.dark_mode = ui.visuals().dark_mode; // I don't like having this here.
 
                 if ui.input_mut(|i| {
                     i.consume_shortcut(&KeyboardShortcut::new(Modifiers::COMMAND, Key::N))
@@ -542,7 +548,7 @@ impl MinesOfRustApp {
             .show(ui, |ui| {
                 ui.label("Difficulty:");
 
-                let cb = egui::ComboBox::new("Cartesian axis", "")
+                let cb = egui::ComboBox::new("GameDifficulty", "")
                     .width(0_f32)
                     .selected_text(self.state.difficulty.as_str());
                 cb.show_ui(ui, |ui| {
@@ -577,8 +583,14 @@ impl MinesOfRustApp {
                 toggle_ui(ui, &mut self.state.fog_of_war);
                 ui.end_row();
 
-                ui.label("Light/Dark Mode:");
-                egui::widgets::global_dark_light_mode_switch(ui);
+                ui.label("Theme:");
+                let cb = egui::ComboBox::new("VisualTheme", "")
+                    .width(0_f32)
+                    .selected_text(self.state.theme.as_str());
+                cb.show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.state.theme, VisualTheme::Dark, "Dark");
+                    ui.selectable_value(&mut self.state.theme, VisualTheme::Light, "Light");
+                });
             });
     }
 

@@ -1,5 +1,20 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Eq, PartialEq, Deserialize, Serialize, Clone)]
+pub enum VisualTheme {
+    Light,
+    Dark,
+}
+
+impl VisualTheme {
+    pub fn as_str(&self) -> &'static str {
+        match *self {
+            VisualTheme::Dark => "Dark",
+            VisualTheme::Light => "Light",
+        }
+    }
+}
+
 #[derive(Eq, PartialEq, Debug, Clone, Deserialize, Serialize)]
 pub enum GameState {
     NotStarted,
