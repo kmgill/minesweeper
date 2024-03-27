@@ -115,6 +115,8 @@ struct MinesOfRustApp {
     leaderboard_visible: bool,
     gamestats_visible: bool,
     plays: PlayList,
+    wins: u32,
+    losses: u32,
 }
 
 fn main() -> Result<(), eframe::Error> {
@@ -152,6 +154,8 @@ fn main() -> Result<(), eframe::Error> {
         leaderboard_visible: false,
         gamestats_visible: false,
         plays: PlayList::default(),
+        wins: 0,
+        losses: 0,
     });
 
     eframe::run_native("Mines of Rust", options, Box::new(|_cc| app))
@@ -345,6 +349,13 @@ impl MinesOfRustApp {
                             ));
                         }
                         ui.end_row();
+
+                        ui.label("Session Wins:");
+                        ui.label(format!(
+                            "{} of {} games",
+                            self.wins,
+                            self.wins + self.losses
+                        ));
                     });
             });
     }
@@ -469,6 +480,7 @@ impl MinesOfRustApp {
             {
                 self.game_state = GameState::EndedLoss;
                 self.game_finished = now();
+                self.losses += 1;
                 "".to_string()
             } else if self.game_state == GameState::Playing && self.gameboard.is_win_configuration()
             {
@@ -476,6 +488,7 @@ impl MinesOfRustApp {
                 self.game_state = GameState::EndedWin;
                 self.gameboard.flag_all_mines();
                 self.game_finished = now();
+                self.wins += 1;
                 self.leaderboards.add(
                     self.state.difficulty.clone(),
                     &whoami::realname(), // Do this until I write a dialog asking for the real name
