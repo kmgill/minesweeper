@@ -371,7 +371,6 @@ impl GameBoard {
         }
         self.squares[idx as usize].is_revealed = true;
 
-        // TODO: Probably not
         let results = iproduct!(-1_i32..2_i32, -1_i32..2_i32)
             .map(|(dx, dy)| self.reveal_protected(x as i32 + dx, y as i32 + dy))
             .collect::<Vec<PlayResult>>();
@@ -527,7 +526,6 @@ impl GameBoard {
             .into_iter()
             .sum::<u32>()
     }
-
 
     // Don't cheat
     #[allow(dead_code)]
