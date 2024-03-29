@@ -422,8 +422,12 @@ impl MinesOfRustApp {
                 }
 
                 ui.vertical_centered(|ui| {
-                    if self.face_ui(ui).clicked() {
+                    let resp = self.face_ui(ui);
+                    if resp.clicked_by(egui::PointerButton::Primary) {
                         self.reset_new_game(ctx).expect("Error building new game");
+                    } else if resp.clicked_by(egui::PointerButton::Secondary) {
+                        self.reset_existing_game(ctx)
+                            .expect("Error building new game");
                     }
                 });
             });
